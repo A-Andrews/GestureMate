@@ -113,6 +113,34 @@ def test_executability():
             all_executable = False
     return all_executable
 
+def test_new_features():
+    """Test that new features are implemented."""
+    print("\nTesting new features...")
+    try:
+        with open('gesturemate.py', 'r') as f:
+            code = f.read()
+            checks = [
+                ('previous_image' in code, "Previous image navigation"),
+                ('shuffle_checkbox' in code, "Shuffle checkbox"),
+                ('flip_horizontal' in code, "Horizontal flip"),
+                ('flip_vertical' in code, "Vertical flip"),
+                ('greyscale' in code, "Greyscale filter"),
+                ('load_config' in code, "Config loading"),
+                ('save_config' in code, "Config saving"),
+                ('QCheckBox' in code, "QCheckBox import for folder enable/disable"),
+            ]
+            all_passed = True
+            for passed, desc in checks:
+                if passed:
+                    print(f"  ✓ {desc} found")
+                else:
+                    print(f"  ✗ {desc} missing")
+                    all_passed = False
+            return all_passed
+    except Exception as e:
+        print(f"✗ New features test failed: {e}")
+        return False
+
 def main():
     """Run all tests."""
     print("=" * 60)
@@ -126,6 +154,7 @@ def main():
         test_readme,
         test_file_structure,
         test_executability,
+        test_new_features,
     ]
     
     results = []

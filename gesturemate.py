@@ -6,6 +6,7 @@ GestureMate - A gesture drawing app for timed figure drawing practice.
 import sys
 import os
 import random
+import json
 from pathlib import Path
 from typing import List
 
@@ -13,21 +14,23 @@ from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QFileDialog, QSpinBox, QListWidget,
     QDialog, QDialogButtonBox, QGroupBox, QFormLayout, QMessageBox,
-    QProgressBar
+    QProgressBar, QCheckBox, QListWidgetItem
 )
-from PyQt6.QtCore import QTimer, Qt, QSize
-from PyQt6.QtGui import QPixmap, QPalette, QColor, QAction
+from PyQt6.QtCore import QTimer, Qt, QSize, QStandardPaths
+from PyQt6.QtGui import QPixmap, QPalette, QColor, QAction, QImage
 
 
 class SettingsDialog(QDialog):
     """Dialog for configuring session settings."""
     
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, saved_folders=None):
         super().__init__(parent)
         self.setWindowTitle("Session Settings")
         self.setModal(True)
         self.folders = []
+        self.saved_folders = saved_folders or {}
         self.setup_ui()
+        self.load_saved_folders()
         
     def setup_ui(self):
         """Setup the settings dialog UI."""
@@ -72,6 +75,17 @@ class SettingsDialog(QDialog):
         timer_group.setLayout(timer_layout)
         layout.addWidget(timer_group)
         
+        # Session options group
+        options_group = QGroupBox("Session Options")
+        options_layout = QVBoxLayout()
+        
+        self.shuffle_checkbox = QCheckBox("Shuffle images")
+        self.shuffle_checkbox.setChecked(True)
+        options_layout.addWidget(self.shuffle_checkbox)
+        
+        options_group.setLayout(options_layout)
+        layout.addWidget(options_group)
+        
         # Dialog buttons
         button_box = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | 
@@ -88,9 +102,20 @@ class SettingsDialog(QDialog):
         folder = QFileDialog.getExistingDirectory(
             self, "Select Image Folder"
         )
-        if folder:
+        if folder and folder not in self.folders:
             self.folders.append(folder)
-            self.folder_list.addItem(folder)
+            item = QListWidgetItem(folder)
+            item.setCheckState(Qt.CheckState.Checked)
+            self.folder_list.addItem(item)
+    
+    def load_saved_folders(self):
+        """Load saved folders into the list."""
+        for folder, enabled in self.saved_folders.items():
+            if folder not in self.folders:
+                self.folders.append(folder)
+                item = QListWidgetItem(folder)
+                item.setCheckState(Qt.CheckState.Checked if enabled else Qt.CheckState.Unchecked)
+                self.folder_list.addItem(item)
             
     def remove_folder(self):
         """Remove selected folder from the list."""
@@ -101,10 +126,23 @@ class SettingsDialog(QDialog):
             
     def get_settings(self):
         """Return the current settings."""
+        # Get enabled folders only
+        enabled_folders = []
+        all_folders = {}
+        for i in range(self.folder_list.count()):
+            item = self.folder_list.item(i)
+            folder = item.text()
+            is_checked = item.checkState() == Qt.CheckState.Checked
+            all_folders[folder] = is_checked
+            if is_checked:
+                enabled_folders.append(folder)
+        
         return {
-            'folders': self.folders,
+            'folders': enabled_folders,
+            'all_folders': all_folders,
             'image_duration': self.image_duration.value(),
-            'session_duration': self.session_duration.value() * 60  # Convert to seconds
+            'session_duration': self.session_duration.value() * 60,  # Convert to seconds
+            'shuffle': self.shuffle_checkbox.isChecked()
         }
 
 
@@ -119,9 +157,18 @@ class GestureMate(QMainWindow):
         self.is_session_active = False
         self.session_time_remaining = 0
         self.image_time_remaining = 0
+        self.shuffle_enabled = True
+        self.current_pixmap = None
+        self.flip_horizontal = False
+        self.flip_vertical = False
+        self.greyscale = False
         
         # Supported image formats
         self.image_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.gif', '.webp'}
+        
+        # Load saved settings
+        self.config_file = self.get_config_file_path()
+        self.saved_folders = self.load_config()
         
         self.setup_ui()
         self.setup_timers()
@@ -188,7 +235,7 @@ class GestureMate(QMainWindow):
     def create_control_panel(self):
         """Create the control panel widget."""
         panel = QWidget()
-        panel.setMaximumHeight(120)
+        panel.setMaximumHeight(180)
         layout = QVBoxLayout()
         
         # Timer displays
@@ -230,6 +277,12 @@ class GestureMate(QMainWindow):
         self.pause_btn.setMinimumHeight(40)
         button_layout.addWidget(self.pause_btn)
         
+        self.prev_btn = QPushButton("Previous")
+        self.prev_btn.clicked.connect(self.previous_image)
+        self.prev_btn.setEnabled(False)
+        self.prev_btn.setMinimumHeight(40)
+        button_layout.addWidget(self.prev_btn)
+        
         self.next_btn = QPushButton("Next Image")
         self.next_btn.clicked.connect(self.next_image)
         self.next_btn.setEnabled(False)
@@ -243,6 +296,29 @@ class GestureMate(QMainWindow):
         button_layout.addWidget(self.stop_btn)
         
         layout.addLayout(button_layout)
+        
+        # Image transformation buttons
+        transform_layout = QHBoxLayout()
+        
+        self.flip_h_btn = QPushButton("Flip Horizontal")
+        self.flip_h_btn.clicked.connect(self.toggle_flip_horizontal)
+        self.flip_h_btn.setEnabled(False)
+        self.flip_h_btn.setCheckable(True)
+        transform_layout.addWidget(self.flip_h_btn)
+        
+        self.flip_v_btn = QPushButton("Flip Vertical")
+        self.flip_v_btn.clicked.connect(self.toggle_flip_vertical)
+        self.flip_v_btn.setEnabled(False)
+        self.flip_v_btn.setCheckable(True)
+        transform_layout.addWidget(self.flip_v_btn)
+        
+        self.greyscale_btn = QPushButton("Greyscale")
+        self.greyscale_btn.clicked.connect(self.toggle_greyscale)
+        self.greyscale_btn.setEnabled(False)
+        self.greyscale_btn.setCheckable(True)
+        transform_layout.addWidget(self.greyscale_btn)
+        
+        layout.addLayout(transform_layout)
         
         panel.setLayout(layout)
         return panel
@@ -275,7 +351,7 @@ class GestureMate(QMainWindow):
         
     def show_settings(self):
         """Show the settings dialog."""
-        dialog = SettingsDialog(self)
+        dialog = SettingsDialog(self, self.saved_folders)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             settings = dialog.get_settings()
             if not settings['folders']:
@@ -285,6 +361,11 @@ class GestureMate(QMainWindow):
                 )
                 return
             
+            # Save configuration
+            self.saved_folders = settings['all_folders']
+            self.save_config()
+            
+            self.shuffle_enabled = settings['shuffle']
             self.load_images(settings['folders'])
             self.image_duration = settings['image_duration']
             self.session_duration = settings['session_duration']
@@ -294,7 +375,8 @@ class GestureMate(QMainWindow):
                     self, "Settings Applied",
                     f"Loaded {len(self.images)} images.\n"
                     f"Image duration: {self.image_duration}s\n"
-                    f"Session duration: {self.session_duration // 60}m"
+                    f"Session duration: {self.session_duration // 60}m\n"
+                    f"Shuffle: {'Yes' if self.shuffle_enabled else 'No'}"
                 )
             else:
                 QMessageBox.warning(
@@ -313,8 +395,12 @@ class GestureMate(QMainWindow):
                     if file_path.is_file() and file_path.suffix.lower() in self.image_extensions:
                         self.images.append(str(file_path))
         
-        # Shuffle images for variety
-        random.shuffle(self.images)
+        # Shuffle images if enabled
+        if self.shuffle_enabled:
+            random.shuffle(self.images)
+        else:
+            self.images.sort()
+        
         self.current_image_index = 0
         
     def start_session(self):
@@ -332,12 +418,24 @@ class GestureMate(QMainWindow):
         self.image_time_remaining = self.image_duration
         self.current_image_index = 0
         
+        # Reset transformations
+        self.flip_horizontal = False
+        self.flip_vertical = False
+        self.greyscale = False
+        self.flip_h_btn.setChecked(False)
+        self.flip_v_btn.setChecked(False)
+        self.greyscale_btn.setChecked(False)
+        
         # Update UI
         self.start_btn.setEnabled(False)
         self.pause_btn.setEnabled(True)
         self.pause_btn.setText("Pause")
+        self.prev_btn.setEnabled(True)
         self.next_btn.setEnabled(True)
         self.stop_btn.setEnabled(True)
+        self.flip_h_btn.setEnabled(True)
+        self.flip_v_btn.setEnabled(True)
+        self.greyscale_btn.setEnabled(True)
         
         # Start timers
         self.session_timer.start(1000)  # 1 second interval
@@ -366,14 +464,19 @@ class GestureMate(QMainWindow):
         # Reset UI
         self.start_btn.setEnabled(True)
         self.pause_btn.setEnabled(False)
+        self.prev_btn.setEnabled(False)
         self.next_btn.setEnabled(False)
         self.stop_btn.setEnabled(False)
+        self.flip_h_btn.setEnabled(False)
+        self.flip_v_btn.setEnabled(False)
+        self.greyscale_btn.setEnabled(False)
         
         self.image_timer_label.setText("Image: --:--")
         self.session_timer_label.setText("Session: --:--")
         self.progress_bar.setValue(0)
         self.image_label.clear()
         self.image_label.setText("Session ended. Click 'Start Session' to begin.")
+        self.current_pixmap = None
         
     def next_image(self):
         """Skip to the next image."""
@@ -383,6 +486,33 @@ class GestureMate(QMainWindow):
         self.current_image_index = (self.current_image_index + 1) % len(self.images)
         self.image_time_remaining = self.image_duration
         self.display_current_image()
+    
+    def previous_image(self):
+        """Go back to the previous image."""
+        if not self.is_session_active:
+            return
+        
+        self.current_image_index = (self.current_image_index - 1) % len(self.images)
+        self.image_time_remaining = self.image_duration
+        self.display_current_image()
+    
+    def toggle_flip_horizontal(self):
+        """Toggle horizontal flip."""
+        self.flip_horizontal = not self.flip_horizontal
+        if self.is_session_active and self.images:
+            self.display_current_image()
+    
+    def toggle_flip_vertical(self):
+        """Toggle vertical flip."""
+        self.flip_vertical = not self.flip_vertical
+        if self.is_session_active and self.images:
+            self.display_current_image()
+    
+    def toggle_greyscale(self):
+        """Toggle greyscale filter."""
+        self.greyscale = not self.greyscale
+        if self.is_session_active and self.images:
+            self.display_current_image()
         
     def update_session_timer(self):
         """Update the session timer."""
@@ -428,6 +558,25 @@ class GestureMate(QMainWindow):
             self.next_image()
             return
         
+        # Apply transformations
+        if self.greyscale or self.flip_horizontal or self.flip_vertical:
+            image = pixmap.toImage()
+            
+            # Apply greyscale
+            if self.greyscale:
+                image = image.convertToFormat(QImage.Format.Format_Grayscale8)
+            
+            # Apply flips
+            if self.flip_horizontal:
+                image = image.mirrored(True, False)
+            if self.flip_vertical:
+                image = image.mirrored(False, True)
+            
+            pixmap = QPixmap.fromImage(image)
+        
+        # Store the current pixmap for transformations
+        self.current_pixmap = pixmap
+        
         # Scale image to fit the label while maintaining aspect ratio
         label_size = self.image_label.size()
         scaled_pixmap = pixmap.scaled(
@@ -457,6 +606,33 @@ class GestureMate(QMainWindow):
             "<li>Ctrl+Q: Quit</li>"
             "</ul>"
         )
+    
+    def get_config_file_path(self):
+        """Get the path to the configuration file."""
+        config_dir = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppConfigLocation)
+        config_path = Path(config_dir)
+        config_path.mkdir(parents=True, exist_ok=True)
+        return config_path / "gesturemate_config.json"
+    
+    def load_config(self):
+        """Load configuration from file."""
+        try:
+            if self.config_file.exists():
+                with open(self.config_file, 'r') as f:
+                    config = json.load(f)
+                    return config.get('folders', {})
+        except Exception as e:
+            print(f"Error loading config: {e}")
+        return {}
+    
+    def save_config(self):
+        """Save configuration to file."""
+        try:
+            config = {'folders': self.saved_folders}
+            with open(self.config_file, 'w') as f:
+                json.dump(config, f, indent=2)
+        except Exception as e:
+            print(f"Error saving config: {e}")
 
 
 def main():
