@@ -16,9 +16,8 @@ from PyQt6.QtWidgets import (
     QDialog, QDialogButtonBox, QGroupBox, QFormLayout, QMessageBox,
     QProgressBar, QCheckBox, QListWidgetItem
 )
-from PyQt6.QtCore import QTimer, Qt, QSize, QStandardPaths, QUrl
+from PyQt6.QtCore import QTimer, Qt, QSize, QStandardPaths
 from PyQt6.QtGui import QPixmap, QPalette, QColor, QAction, QImage, QKeySequence
-from PyQt6.QtMultimedia import QSoundEffect
 
 
 class SettingsDialog(QDialog):
@@ -404,35 +403,8 @@ class GestureMate(QMainWindow):
     
     def setup_sound(self):
         """Setup the sound effect for halfway notification."""
-        self.sound_effect = QSoundEffect()
-        # Create a simple beep sound file if it doesn't exist
-        self.sound_file = self.get_config_file_path().parent / "beep.wav"
-        if not self.sound_file.exists():
-            self.create_beep_sound()
-        self.sound_effect.setSource(QUrl.fromLocalFile(str(self.sound_file)))
-        self.sound_effect.setVolume(0.5)
-    
-    def create_beep_sound(self):
-        """Create a simple beep sound file."""
-        import wave
-        import struct
-        import math
-        
-        # Generate a simple beep sound
-        sample_rate = 44100
-        duration = 0.2  # 200ms beep
-        frequency = 800  # 800 Hz
-        
-        num_samples = int(sample_rate * duration)
-        
-        with wave.open(str(self.sound_file), 'w') as wav_file:
-            wav_file.setnchannels(1)  # Mono
-            wav_file.setsampwidth(2)  # 16-bit
-            wav_file.setframerate(sample_rate)
-            
-            for i in range(num_samples):
-                value = int(32767 * 0.3 * math.sin(2 * math.pi * frequency * i / sample_rate))
-                wav_file.writeframes(struct.pack('<h', value))
+        # Use system beep as a simple cross-platform solution
+        self.use_system_beep = True
         
     def set_dark_theme(self):
         """Apply a dark theme to the application."""
@@ -684,7 +656,8 @@ class GestureMate(QMainWindow):
             self.image_time_remaining <= self.image_duration / 2):
             self.halfway_sound_played = True
             try:
-                self.sound_effect.play()
+                # Use system beep
+                QApplication.beep()
             except Exception as e:
                 print(f"Error playing sound: {e}")
         
