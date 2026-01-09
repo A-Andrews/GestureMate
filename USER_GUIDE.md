@@ -43,7 +43,39 @@ GestureMate is a desktop application designed for artists who want to practice g
 - Skip to the next reference if needed
 - Useful if you finish early or want to try something different
 
-### 5. Progress Tracking
+**Previous Image:**
+- Go back to the previous reference
+- Review an image you want to study longer or restart
+
+### 5. Image Transformations
+
+**Flip Horizontal:**
+- Mirror the image horizontally
+- Great for breaking visual habits and seeing poses from a new perspective
+
+**Flip Vertical:**
+- Flip the image upside down
+- Helps you focus on shapes rather than recognizing what you're drawing
+
+**Greyscale:**
+- Convert the image to black and white
+- Useful for focusing on values and forms without color distraction
+
+All transformations can be toggled on/off independently during a session.
+
+### 6. Smart Settings Persistence
+
+**Saved Folder Configuration:**
+- Your folder selections are automatically saved
+- Each folder has a checkbox to enable/disable it for the current session
+- No need to reselect folders every time you start the app
+
+**Shuffle Control:**
+- Choose whether to shuffle images randomly or display them in order
+- Shuffling is enabled by default for variety
+- Perfect for organized practice when disabled
+
+### 7. Progress Tracking
 - See how much time remains for the current image
 - Track total session time remaining
 - Visual progress bar shows overall session completion
