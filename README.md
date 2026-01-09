@@ -5,7 +5,11 @@ A gesture drawing practice application for artists. GestureMate helps you practi
 ## Features
 
 - 📁 **Multiple Folder Support**: Load images from multiple directories
+- ✅ **Persistent Settings**: Folder selections are saved and can be toggled on/off
+- 🔀 **Shuffle Control**: Choose to shuffle images or display them in order
 - ⏱️ **Customizable Timers**: Set duration per image and total session length
+- ⬅️ **Image Navigation**: Move forward and backward through images
+- 🔄 **Image Transformations**: Flip horizontally, vertically, or convert to greyscale
 - 🖼️ **Smart Image Scaling**: Images automatically fit to your screen size
 - 🎨 **Clean Interface**: Simple, distraction-free dark theme
 - 🐧 **Linux Compatible**: Built with PyQt6 for cross-platform support
@@ -62,15 +66,20 @@ chmod +x gesturemate.py
 
 1. **Configure Settings** (Ctrl+S or File → Settings)
    - Click "Add Folder" to select directories containing your reference images
+   - Previously selected folders will be remembered and shown with checkboxes
+   - Toggle folders on/off to include/exclude them from the session
    - Set the duration per image (in seconds)
    - Set the total session duration (in minutes)
+   - Choose whether to shuffle images (enabled by default)
    - Click OK to apply settings
 
 2. **Start Your Session**
    - Click "Start Session" to begin
    - Images will automatically advance based on your timer settings
-   - Use "Pause" to take a break
+   - Use "Previous" to go back to the previous image
    - Use "Next Image" to skip to the next reference
+   - Use "Pause" to take a break
+   - Use transformation buttons to flip images or convert to greyscale
    - Use "Stop" to end the session early
 
 ### Keyboard Shortcuts
