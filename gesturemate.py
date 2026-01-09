@@ -16,19 +16,23 @@ from PyQt6.QtWidgets import (
     QDialog, QDialogButtonBox, QGroupBox, QFormLayout, QMessageBox,
     QProgressBar, QCheckBox, QListWidgetItem
 )
-from PyQt6.QtCore import QTimer, Qt, QSize, QStandardPaths
-from PyQt6.QtGui import QPixmap, QPalette, QColor, QAction, QImage
+from PyQt6.QtCore import QTimer, Qt, QSize, QStandardPaths, QUrl
+from PyQt6.QtGui import QPixmap, QPalette, QColor, QAction, QImage, QKeySequence
+from PyQt6.QtMultimedia import QSoundEffect
 
 
 class SettingsDialog(QDialog):
     """Dialog for configuring session settings."""
     
-    def __init__(self, parent=None, saved_folders=None):
+    def __init__(self, parent=None, saved_folders=None, image_duration=60, session_duration=30, halfway_sound=True):
         super().__init__(parent)
         self.setWindowTitle("Session Settings")
         self.setModal(True)
         self.folders = []
         self.saved_folders = saved_folders or {}
+        self.default_image_duration = image_duration
+        self.default_session_duration = session_duration
+        self.default_halfway_sound = halfway_sound
         self.setup_ui()
         self.load_saved_folders()
         
@@ -62,13 +66,13 @@ class SettingsDialog(QDialog):
         
         self.image_duration = QSpinBox()
         self.image_duration.setRange(10, 3600)
-        self.image_duration.setValue(60)
+        self.image_duration.setValue(self.default_image_duration)
         self.image_duration.setSuffix(" seconds")
         timer_layout.addRow("Duration per image:", self.image_duration)
         
         self.session_duration = QSpinBox()
         self.session_duration.setRange(1, 480)
-        self.session_duration.setValue(30)
+        self.session_duration.setValue(self.default_session_duration)
         self.session_duration.setSuffix(" minutes")
         timer_layout.addRow("Total session duration:", self.session_duration)
         
@@ -82,6 +86,10 @@ class SettingsDialog(QDialog):
         self.shuffle_checkbox = QCheckBox("Shuffle images")
         self.shuffle_checkbox.setChecked(True)
         options_layout.addWidget(self.shuffle_checkbox)
+        
+        self.halfway_sound_checkbox = QCheckBox("Play sound halfway through each image")
+        self.halfway_sound_checkbox.setChecked(self.default_halfway_sound)
+        options_layout.addWidget(self.halfway_sound_checkbox)
         
         options_group.setLayout(options_layout)
         layout.addWidget(options_group)
@@ -142,7 +150,8 @@ class SettingsDialog(QDialog):
             'all_folders': all_folders,
             'image_duration': self.image_duration.value(),
             'session_duration': self.session_duration.value() * 60,  # Convert to seconds
-            'shuffle': self.shuffle_checkbox.isChecked()
+            'shuffle': self.shuffle_checkbox.isChecked(),
+            'halfway_sound': self.halfway_sound_checkbox.isChecked()
         }
 
 
@@ -153,6 +162,7 @@ class GestureMate(QMainWindow):
         super().__init__()
         self.setWindowTitle("GestureMate - Gesture Drawing Practice")
         self.images = []
+        self.images_per_folder = {}  # Track image counts per folder
         self.current_image_index = 0
         self.is_session_active = False
         self.session_time_remaining = 0
@@ -162,13 +172,26 @@ class GestureMate(QMainWindow):
         self.flip_horizontal = False
         self.flip_vertical = False
         self.greyscale = False
+        self.halfway_sound_played = False
+        
+        # Default settings
+        self.image_duration = 60  # 60 seconds default
+        self.session_duration = 1800  # 30 minutes default
+        self.halfway_sound_enabled = True
         
         # Supported image formats
         self.image_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.gif', '.webp'}
         
         # Load saved settings
         self.config_file = self.get_config_file_path()
-        self.saved_folders = self.load_config()
+        config = self.load_config()
+        self.saved_folders = config.get('folders', {})
+        self.image_duration = config.get('image_duration', 60)
+        self.session_duration = config.get('session_duration', 1800)
+        self.halfway_sound_enabled = config.get('halfway_sound', True)
+        
+        # Setup sound effect
+        self.setup_sound()
         
         self.setup_ui()
         self.setup_timers()
@@ -224,6 +247,54 @@ class GestureMate(QMainWindow):
         exit_action.setShortcut("Ctrl+Q")
         exit_action.triggered.connect(self.close)
         file_menu.addAction(exit_action)
+        
+        # Session menu
+        session_menu = menubar.addMenu("S&ession")
+        
+        start_action = QAction("&Start Session", self)
+        start_action.setShortcut("Space")
+        start_action.triggered.connect(self.start_session)
+        session_menu.addAction(start_action)
+        
+        pause_action = QAction("&Pause/Resume", self)
+        pause_action.setShortcut("P")
+        pause_action.triggered.connect(self.pause_session)
+        session_menu.addAction(pause_action)
+        
+        stop_action = QAction("S&top Session", self)
+        stop_action.setShortcut("Escape")
+        stop_action.triggered.connect(self.stop_session)
+        session_menu.addAction(stop_action)
+        
+        session_menu.addSeparator()
+        
+        next_action = QAction("&Next Image", self)
+        next_action.setShortcut("Right")
+        next_action.triggered.connect(self.next_image)
+        session_menu.addAction(next_action)
+        
+        prev_action = QAction("Pre&vious Image", self)
+        prev_action.setShortcut("Left")
+        prev_action.triggered.connect(self.previous_image)
+        session_menu.addAction(prev_action)
+        
+        # Transform menu
+        transform_menu = menubar.addMenu("&Transform")
+        
+        flip_h_action = QAction("Flip &Horizontal", self)
+        flip_h_action.setShortcut("H")
+        flip_h_action.triggered.connect(self.toggle_flip_horizontal)
+        transform_menu.addAction(flip_h_action)
+        
+        flip_v_action = QAction("Flip &Vertical", self)
+        flip_v_action.setShortcut("V")
+        flip_v_action.triggered.connect(self.toggle_flip_vertical)
+        transform_menu.addAction(flip_v_action)
+        
+        greyscale_action = QAction("&Greyscale", self)
+        greyscale_action.setShortcut("G")
+        greyscale_action.triggered.connect(self.toggle_greyscale)
+        transform_menu.addAction(greyscale_action)
         
         # Help menu
         help_menu = menubar.addMenu("&Help")
@@ -330,6 +401,38 @@ class GestureMate(QMainWindow):
         
         self.image_timer = QTimer()
         self.image_timer.timeout.connect(self.update_image_timer)
+    
+    def setup_sound(self):
+        """Setup the sound effect for halfway notification."""
+        self.sound_effect = QSoundEffect()
+        # Create a simple beep sound file if it doesn't exist
+        self.sound_file = self.get_config_file_path().parent / "beep.wav"
+        if not self.sound_file.exists():
+            self.create_beep_sound()
+        self.sound_effect.setSource(QUrl.fromLocalFile(str(self.sound_file)))
+        self.sound_effect.setVolume(0.5)
+    
+    def create_beep_sound(self):
+        """Create a simple beep sound file."""
+        import wave
+        import struct
+        import math
+        
+        # Generate a simple beep sound
+        sample_rate = 44100
+        duration = 0.2  # 200ms beep
+        frequency = 800  # 800 Hz
+        
+        num_samples = int(sample_rate * duration)
+        
+        with wave.open(str(self.sound_file), 'w') as wav_file:
+            wav_file.setnchannels(1)  # Mono
+            wav_file.setsampwidth(2)  # 16-bit
+            wav_file.setframerate(sample_rate)
+            
+            for i in range(num_samples):
+                value = int(32767 * 0.3 * math.sin(2 * math.pi * frequency * i / sample_rate))
+                wav_file.writeframes(struct.pack('<h', value))
         
     def set_dark_theme(self):
         """Apply a dark theme to the application."""
@@ -351,7 +454,13 @@ class GestureMate(QMainWindow):
         
     def show_settings(self):
         """Show the settings dialog."""
-        dialog = SettingsDialog(self, self.saved_folders)
+        dialog = SettingsDialog(
+            self, 
+            self.saved_folders,
+            self.image_duration,
+            self.session_duration // 60,  # Convert back to minutes
+            self.halfway_sound_enabled
+        )
         if dialog.exec() == QDialog.DialogCode.Accepted:
             settings = dialog.get_settings()
             if not settings['folders']:
@@ -363,20 +472,28 @@ class GestureMate(QMainWindow):
             
             # Save configuration
             self.saved_folders = settings['all_folders']
+            self.image_duration = settings['image_duration']
+            self.session_duration = settings['session_duration']
+            self.halfway_sound_enabled = settings['halfway_sound']
             self.save_config()
             
             self.shuffle_enabled = settings['shuffle']
             self.load_images(settings['folders'])
-            self.image_duration = settings['image_duration']
-            self.session_duration = settings['session_duration']
             
             if self.images:
+                # Build folder count message
+                folder_info = "\n".join([
+                    f"  • {Path(folder).name}: {count} images"
+                    for folder, count in self.images_per_folder.items()
+                ])
                 QMessageBox.information(
                     self, "Settings Applied",
-                    f"Loaded {len(self.images)} images.\n"
+                    f"Loaded {len(self.images)} total images from {len(self.images_per_folder)} folder(s):\n\n"
+                    f"{folder_info}\n\n"
                     f"Image duration: {self.image_duration}s\n"
                     f"Session duration: {self.session_duration // 60}m\n"
-                    f"Shuffle: {'Yes' if self.shuffle_enabled else 'No'}"
+                    f"Shuffle: {'Yes' if self.shuffle_enabled else 'No'}\n"
+                    f"Halfway sound: {'Yes' if self.halfway_sound_enabled else 'No'}"
                 )
             else:
                 QMessageBox.warning(
@@ -388,12 +505,20 @@ class GestureMate(QMainWindow):
     def load_images(self, folders: List[str]):
         """Load images from the specified folders."""
         self.images = []
+        self.images_per_folder = {}
+        
         for folder in folders:
             folder_path = Path(folder)
             if folder_path.exists():
+                folder_images = []
                 for file_path in folder_path.rglob('*'):
                     if file_path.is_file() and file_path.suffix.lower() in self.image_extensions:
-                        self.images.append(str(file_path))
+                        folder_images.append(str(file_path))
+                
+                # Track count per folder
+                if folder_images:
+                    self.images_per_folder[folder] = len(folder_images)
+                    self.images.extend(folder_images)
         
         # Shuffle images if enabled
         if self.shuffle_enabled:
@@ -406,17 +531,26 @@ class GestureMate(QMainWindow):
     def start_session(self):
         """Start a drawing session."""
         if not self.images:
-            QMessageBox.warning(
-                self, "No Images",
-                "Please configure settings and select image folders first."
-            )
-            self.show_settings()
-            return
+            # Try to load images from saved folders if available
+            enabled_folders = [folder for folder, enabled in self.saved_folders.items() if enabled]
+            if enabled_folders:
+                self.load_images(enabled_folders)
+            
+            if not self.images:
+                response = QMessageBox.question(
+                    self, "No Images",
+                    "No images have been loaded yet. Would you like to configure settings now?",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+                )
+                if response == QMessageBox.StandardButton.Yes:
+                    self.show_settings()
+                return
         
         self.is_session_active = True
         self.session_time_remaining = self.session_duration
         self.image_time_remaining = self.image_duration
         self.current_image_index = 0
+        self.halfway_sound_played = False
         
         # Reset transformations
         self.flip_horizontal = False
@@ -485,6 +619,7 @@ class GestureMate(QMainWindow):
         
         self.current_image_index = (self.current_image_index + 1) % len(self.images)
         self.image_time_remaining = self.image_duration
+        self.halfway_sound_played = False
         self.display_current_image()
     
     def previous_image(self):
@@ -494,6 +629,7 @@ class GestureMate(QMainWindow):
         
         self.current_image_index = (self.current_image_index - 1) % len(self.images)
         self.image_time_remaining = self.image_duration
+        self.halfway_sound_played = False
         self.display_current_image()
     
     def toggle_flip_horizontal(self):
@@ -541,6 +677,16 @@ class GestureMate(QMainWindow):
         minutes = self.image_time_remaining // 60
         seconds = self.image_time_remaining % 60
         self.image_timer_label.setText(f"Image: {minutes:02d}:{seconds:02d}")
+        
+        # Play sound at halfway point
+        if (self.halfway_sound_enabled and 
+            not self.halfway_sound_played and 
+            self.image_time_remaining <= self.image_duration / 2):
+            self.halfway_sound_played = True
+            try:
+                self.sound_effect.play()
+            except Exception as e:
+                print(f"Error playing sound: {e}")
         
         if self.image_time_remaining <= 0:
             self.next_image()
@@ -604,6 +750,14 @@ class GestureMate(QMainWindow):
             "<ul>"
             "<li>Ctrl+S: Settings</li>"
             "<li>Ctrl+Q: Quit</li>"
+            "<li>Space: Start Session</li>"
+            "<li>P: Pause/Resume</li>"
+            "<li>Escape: Stop Session</li>"
+            "<li>Right Arrow: Next Image</li>"
+            "<li>Left Arrow: Previous Image</li>"
+            "<li>H: Flip Horizontal</li>"
+            "<li>V: Flip Vertical</li>"
+            "<li>G: Greyscale</li>"
             "</ul>"
         )
     
@@ -619,8 +773,7 @@ class GestureMate(QMainWindow):
         try:
             if self.config_file.exists():
                 with open(self.config_file, 'r') as f:
-                    config = json.load(f)
-                    return config.get('folders', {})
+                    return json.load(f)
         except Exception as e:
             print(f"Error loading config: {e}")
         return {}
@@ -628,7 +781,12 @@ class GestureMate(QMainWindow):
     def save_config(self):
         """Save configuration to file."""
         try:
-            config = {'folders': self.saved_folders}
+            config = {
+                'folders': self.saved_folders,
+                'image_duration': self.image_duration,
+                'session_duration': self.session_duration,
+                'halfway_sound': self.halfway_sound_enabled
+            }
             with open(self.config_file, 'w') as f:
                 json.dump(config, f, indent=2)
         except Exception as e:
