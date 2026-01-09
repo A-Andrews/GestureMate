@@ -522,7 +522,7 @@ class GestureMate(QMainWindow):
         self.is_session_active = True
         self.session_time_remaining = self.session_duration
         self.image_time_remaining = self.image_duration
-        self.image_duration_half = self.image_duration / 2  # Pre-calculate halfway point
+        self.image_duration_half = self.image_duration // 2  # Integer division for exact comparison
         self.current_image_index = 0
         self.halfway_sound_played = False
         
