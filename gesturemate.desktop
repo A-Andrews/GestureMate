@@ -3,8 +3,9 @@ Version=1.0
 Type=Application
 Name=GestureMate
 Comment=Gesture drawing practice application
-Exec=/usr/bin/python3 %d/gesturemate.py
+Exec=python3 /usr/local/bin/gesturemate.py
 Icon=accessories-painting
 Terminal=false
 Categories=Graphics;Education;Art;
 Keywords=drawing;gesture;practice;art;figure;
+# Note: Update the Exec path to match your installation directory

@@ -32,11 +32,16 @@ def test_supported_formats():
     # Extract the image extensions from the code
     with open('gesturemate.py', 'r') as f:
         code = f.read()
-        if "'.jpg'" in code and "'.png'" in code and "'.bmp'" in code:
-            print("✓ Supported image formats: JPG, PNG, BMP, GIF, WEBP")
+        # Check for all supported formats
+        required_formats = ["'.jpg'", "'.jpeg'", "'.png'", "'.bmp'", "'.gif'", "'.webp'"]
+        all_found = all(fmt in code for fmt in required_formats)
+        if all_found:
+            print("✓ Supported image formats: JPG, JPEG, PNG, BMP, GIF, WEBP")
             return True
-    print("✗ Image format check failed")
-    return False
+        else:
+            missing = [fmt for fmt in required_formats if fmt not in code]
+            print(f"✗ Missing image formats: {missing}")
+            return False
 
 def test_requirements():
     """Test requirements.txt exists and has PyQt6."""

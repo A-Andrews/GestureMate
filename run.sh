@@ -10,8 +10,13 @@ fi
 
 # Check if PyQt6 is installed
 if ! python3 -c "import PyQt6" 2>/dev/null; then
-    echo "PyQt6 is not installed. Installing dependencies..."
-    pip install -r requirements.txt
+    echo "PyQt6 is not installed."
+    echo "Installing dependencies (user installation)..."
+    pip install --user -r requirements.txt || {
+        echo "Failed to install dependencies."
+        echo "Please run: pip install --user -r requirements.txt"
+        exit 1
+    }
 fi
 
 # Run the application
