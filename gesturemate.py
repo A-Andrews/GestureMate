@@ -17,7 +17,7 @@ from PyQt6.QtWidgets import (
     QProgressBar, QCheckBox, QListWidgetItem
 )
 from PyQt6.QtCore import QTimer, Qt, QSize, QStandardPaths
-from PyQt6.QtGui import QPixmap, QPalette, QColor, QAction, QImage, QKeySequence
+from PyQt6.QtGui import QPixmap, QPalette, QColor, QAction, QImage
 
 
 class SettingsDialog(QDialog):
@@ -172,6 +172,7 @@ class GestureMate(QMainWindow):
         self.flip_vertical = False
         self.greyscale = False
         self.halfway_sound_played = False
+        self.image_duration_half = 0  # Cache for halfway point
         
         # Default settings
         self.image_duration = 60  # 60 seconds default
@@ -521,6 +522,7 @@ class GestureMate(QMainWindow):
         self.is_session_active = True
         self.session_time_remaining = self.session_duration
         self.image_time_remaining = self.image_duration
+        self.image_duration_half = self.image_duration / 2  # Pre-calculate halfway point
         self.current_image_index = 0
         self.halfway_sound_played = False
         
@@ -653,10 +655,9 @@ class GestureMate(QMainWindow):
         # Play sound at halfway point
         if (self.halfway_sound_enabled and 
             not self.halfway_sound_played and 
-            self.image_time_remaining <= self.image_duration / 2):
+            self.image_time_remaining <= self.image_duration_half):
             self.halfway_sound_played = True
             try:
-                # Use system beep
                 QApplication.beep()
             except Exception as e:
                 print(f"Error playing sound: {e}")
