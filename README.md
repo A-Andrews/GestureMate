@@ -5,15 +5,18 @@ A gesture drawing practice application for artists. GestureMate helps you practi
 ## Features
 
 - 📁 **Multiple Folder Support**: Load images from multiple directories
-- ✅ **Persistent Settings**: Folder selections are saved and can be toggled on/off
+- ✅ **Persistent Settings**: Folder selections and timer presets are saved and can be toggled on/off
+- 📊 **Folder Statistics**: See how many images are loaded from each folder
 - 🔀 **Shuffle Control**: Choose to shuffle images or display them in order
-- ⏱️ **Customizable Timers**: Set duration per image and total session length
+- ⏱️ **Customizable Timers**: Set duration per image and total session length (presets saved automatically)
 - ⬅️ **Image Navigation**: Move forward and backward through images
+- ⌨️ **Full Keyboard Support**: Complete hotkey support for hands-free operation
 - 🔄 **Image Transformations**: Flip horizontally, vertically, or convert to greyscale
+- 🔔 **Halfway Notification**: Optional audio beep at 50% of image time
+- 🚀 **Quick Start**: Start sessions immediately without configuring settings
 - 🖼️ **Smart Image Scaling**: Images automatically fit to your screen size
 - 🎨 **Clean Interface**: Simple, distraction-free dark theme
 - 🐧 **Linux Compatible**: Built with PyQt6 for cross-platform support
-- ⌨️ **Keyboard Shortcuts**: Quick access to common actions
 
 ## Installation
 
@@ -84,6 +87,21 @@ chmod +x gesturemate.py
 
 ### Keyboard Shortcuts
 
+#### Session Control
+- `Space`: Start Session
+- `P`: Pause/Resume Session
+- `Escape`: Stop Session
+
+#### Image Navigation
+- `Right Arrow`: Next Image
+- `Left Arrow`: Previous Image
+
+#### Image Transformations
+- `H`: Flip Horizontal
+- `V`: Flip Vertical
+- `G`: Toggle Greyscale
+
+#### Application
 - `Ctrl+S`: Open Settings
 - `Ctrl+Q`: Quit Application
 
