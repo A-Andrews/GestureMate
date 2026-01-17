@@ -129,8 +129,8 @@ class SettingsDialog(QDialog):
             # This is a top-level folder, propagate state to all children
             new_state = item.checkState(0)
             
-            # Temporarily disconnect the signal to avoid recursive calls
-            self.folder_tree.itemChanged.disconnect(self.on_item_changed)
+            # Block signals to avoid recursive calls
+            self.folder_tree.blockSignals(True)
             
             try:
                 # Set all children to the same state
@@ -138,8 +138,8 @@ class SettingsDialog(QDialog):
                     child = item.child(i)
                     child.setCheckState(0, new_state)
             finally:
-                # Reconnect the signal
-                self.folder_tree.itemChanged.connect(self.on_item_changed)
+                # Unblock signals
+                self.folder_tree.blockSignals(False)
     
     def count_images_in_folder(self, folder_path):
         """Count images in a specific folder (non-recursive)."""
