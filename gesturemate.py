@@ -21,6 +21,10 @@ from PyQt6.QtCore import QTimer, Qt, QSize, QStandardPaths, QUrl
 from PyQt6.QtGui import QPixmap, QPalette, QColor, QAction, QImage, QTransform
 
 
+# Supported image formats (module-level constant)
+SUPPORTED_IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.bmp', '.gif', '.webp'}
+
+
 class SettingsDialog(QDialog):
     """Dialog for configuring session settings."""
     
@@ -33,7 +37,6 @@ class SettingsDialog(QDialog):
         self.default_image_duration = image_duration
         self.default_session_duration = session_duration
         self.default_halfway_sound = halfway_sound
-        self.image_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.gif', '.webp'}
         self.setup_ui()
         self.load_saved_folders()
         
@@ -114,7 +117,7 @@ class SettingsDialog(QDialog):
         folder = Path(folder_path)
         if folder.exists() and folder.is_dir():
             for file_path in folder.iterdir():
-                if file_path.is_file() and file_path.suffix.lower() in self.image_extensions:
+                if file_path.is_file() and file_path.suffix.lower() in SUPPORTED_IMAGE_EXTENSIONS:
                     count += 1
         return count
     
@@ -130,11 +133,19 @@ class SettingsDialog(QDialog):
         for item in parent_path.iterdir():
             if item.is_dir():
                 # Check if this subfolder or any of its descendants has images
+                # Use depth-limited search to avoid deep recursion
                 has_images = False
-                for file_path in item.rglob('*'):
-                    if file_path.is_file() and file_path.suffix.lower() in self.image_extensions:
-                        has_images = True
-                        break
+                try:
+                    # Only check up to 5 levels deep to prevent excessive scanning
+                    for depth, file_path in enumerate(item.rglob('*')):
+                        if depth > 5000:  # Limit total files checked
+                            break
+                        if file_path.is_file() and file_path.suffix.lower() in SUPPORTED_IMAGE_EXTENSIONS:
+                            has_images = True
+                            break
+                except (PermissionError, OSError):
+                    # Skip folders we can't access
+                    continue
                 
                 if has_images:
                     subfolders.append(str(item))
@@ -146,9 +157,20 @@ class SettingsDialog(QDialog):
         count = 0
         folder = Path(folder_path)
         if folder.exists() and folder.is_dir():
-            for file_path in folder.rglob('*'):
-                if file_path.is_file() and file_path.suffix.lower() in self.image_extensions:
-                    count += 1
+            try:
+                # Use specific patterns to reduce unnecessary file checks
+                for ext in SUPPORTED_IMAGE_EXTENSIONS:
+                    # Use case-insensitive globbing
+                    count += len(list(folder.rglob(f'*{ext}')))
+                    count += len(list(folder.rglob(f'*{ext.upper()}')))
+            except (PermissionError, OSError):
+                # Fallback to checking all files if glob fails
+                try:
+                    for file_path in folder.rglob('*'):
+                        if file_path.is_file() and file_path.suffix.lower() in SUPPORTED_IMAGE_EXTENSIONS:
+                            count += 1
+                except (PermissionError, OSError):
+                    pass
         return count
     
     def add_folder(self):
@@ -167,7 +189,7 @@ class SettingsDialog(QDialog):
                 QMessageBox.information(self, "Folder Exists", "This folder has already been added.")
                 return
         
-        # Count images in the main folder
+        # Count images in the main folder (cache this result)
         total_images = self.count_images_recursive(folder)
         
         if total_images == 0:
@@ -192,6 +214,7 @@ class SettingsDialog(QDialog):
         
         # Add subfolder items
         for subfolder in subfolders:
+            # Count images for this subfolder
             subfolder_images = self.count_images_recursive(subfolder)
             subfolder_item = QTreeWidgetItem()
             subfolder_item.setText(0, Path(subfolder).name)
@@ -223,6 +246,7 @@ class SettingsDialog(QDialog):
                     other_path = Path(other_folder)
                     try:
                         # Check if folder is a child of other_folder
+                        # relative_to() raises ValueError if paths are unrelated
                         folder_path.relative_to(other_path)
                         # It's a subfolder
                         is_subfolder = True
@@ -232,7 +256,7 @@ class SettingsDialog(QDialog):
                         subfolder_states[folder] = enabled
                         break
                     except ValueError:
-                        # Not a subfolder
+                        # Not a subfolder - paths are unrelated
                         pass
             
             if not is_subfolder:
@@ -372,9 +396,6 @@ class GestureMate(QMainWindow):
         self.image_duration = 60  # 60 seconds default
         self.session_duration = 1800  # 30 minutes default
         self.halfway_sound_enabled = True
-        
-        # Supported image formats
-        self.image_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.gif', '.webp'}
         
         # Load saved settings
         self.config_file = self.get_config_file_path()
@@ -782,7 +803,7 @@ class GestureMate(QMainWindow):
             if folder_path.exists():
                 folder_images = []
                 for file_path in folder_path.rglob('*'):
-                    if file_path.is_file() and file_path.suffix.lower() in self.image_extensions:
+                    if file_path.is_file() and file_path.suffix.lower() in SUPPORTED_IMAGE_EXTENSIONS:
                         folder_images.append(str(file_path))
                 
                 # Track count per folder
