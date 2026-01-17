@@ -133,12 +133,14 @@ class SettingsDialog(QDialog):
         for item in parent_path.iterdir():
             if item.is_dir():
                 # Check if this subfolder or any of its descendants has images
-                # Use depth-limited search to avoid deep recursion
+                # Limit iteration to prevent excessive scanning
                 has_images = False
                 try:
-                    # Only check up to 5 levels deep to prevent excessive scanning
-                    for depth, file_path in enumerate(item.rglob('*')):
-                        if depth > 5000:  # Limit total files checked
+                    file_count = 0
+                    max_files_to_check = 5000  # Limit total files checked
+                    for file_path in item.rglob('*'):
+                        file_count += 1
+                        if file_count > max_files_to_check:
                             break
                         if file_path.is_file() and file_path.suffix.lower() in SUPPORTED_IMAGE_EXTENSIONS:
                             has_images = True
@@ -158,19 +160,13 @@ class SettingsDialog(QDialog):
         folder = Path(folder_path)
         if folder.exists() and folder.is_dir():
             try:
-                # Use specific patterns to reduce unnecessary file checks
-                for ext in SUPPORTED_IMAGE_EXTENSIONS:
-                    # Use case-insensitive globbing
-                    count += len(list(folder.rglob(f'*{ext}')))
-                    count += len(list(folder.rglob(f'*{ext.upper()}')))
+                # Use single rglob('*') and filter by extension for efficiency
+                for file_path in folder.rglob('*'):
+                    if file_path.is_file() and file_path.suffix.lower() in SUPPORTED_IMAGE_EXTENSIONS:
+                        count += 1
             except (PermissionError, OSError):
-                # Fallback to checking all files if glob fails
-                try:
-                    for file_path in folder.rglob('*'):
-                        if file_path.is_file() and file_path.suffix.lower() in SUPPORTED_IMAGE_EXTENSIONS:
-                            count += 1
-                except (PermissionError, OSError):
-                    pass
+                # Skip folders we can't access
+                pass
         return count
     
     def add_folder(self):
