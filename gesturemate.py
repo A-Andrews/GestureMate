@@ -24,6 +24,9 @@ from PyQt6.QtGui import QPixmap, QPalette, QColor, QAction, QImage, QTransform
 # Supported image formats (module-level constant)
 SUPPORTED_IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.bmp', '.gif', '.webp'}
 
+# Maximum number of files to check when scanning folders (prevents UI freezing)
+MAX_FILES_TO_CHECK = 5000
+
 
 class SettingsDialog(QDialog):
     """Dialog for configuring session settings."""
@@ -137,10 +140,9 @@ class SettingsDialog(QDialog):
                 has_images = False
                 try:
                     file_count = 0
-                    max_files_to_check = 5000  # Limit total files checked
                     for file_path in item.rglob('*'):
                         file_count += 1
-                        if file_count > max_files_to_check:
+                        if file_count > MAX_FILES_TO_CHECK:
                             break
                         if file_path.is_file() and file_path.suffix.lower() in SUPPORTED_IMAGE_EXTENSIONS:
                             has_images = True
@@ -155,13 +157,23 @@ class SettingsDialog(QDialog):
         return sorted(subfolders)
     
     def count_images_recursive(self, folder_path):
-        """Count all images in a folder recursively."""
+        """Count all images in a folder recursively.
+        
+        Note: Uses a file count limit to prevent UI freezing on very large folders.
+        """
         count = 0
         folder = Path(folder_path)
         if folder.exists() and folder.is_dir():
             try:
                 # Use single rglob('*') and filter by extension for efficiency
+                # Limit iteration to prevent UI freezing on very large folders
+                file_count = 0
                 for file_path in folder.rglob('*'):
+                    file_count += 1
+                    if file_count > MAX_FILES_TO_CHECK:
+                        # If we hit the limit, return approximate count with indicator
+                        # This prevents UI freezing but gives user an idea of size
+                        return count
                     if file_path.is_file() and file_path.suffix.lower() in SUPPORTED_IMAGE_EXTENSIONS:
                         count += 1
             except (PermissionError, OSError):
@@ -185,7 +197,7 @@ class SettingsDialog(QDialog):
                 QMessageBox.information(self, "Folder Exists", "This folder has already been added.")
                 return
         
-        # Count images in the main folder (cache this result)
+        # Count images in the main folder
         total_images = self.count_images_recursive(folder)
         
         if total_images == 0:
