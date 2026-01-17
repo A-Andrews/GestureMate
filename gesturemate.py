@@ -54,6 +54,7 @@ class SettingsDialog(QDialog):
         self.folder_tree = QTreeWidget()
         self.folder_tree.setHeaderLabels(["Folder", "Images"])
         self.folder_tree.setColumnWidth(0, 400)
+        self.folder_tree.itemChanged.connect(self.on_item_changed)
         folder_layout.addWidget(self.folder_tree)
         
         folder_btn_layout = QHBoxLayout()
@@ -114,6 +115,32 @@ class SettingsDialog(QDialog):
         
         self.setLayout(layout)
         
+    def on_item_changed(self, item, column):
+        """Handle item checkbox state changes.
+        
+        When a top-level folder's checkbox is changed, propagate the state to all children.
+        """
+        # Only handle checkbox changes in column 0
+        if column != 0:
+            return
+        
+        # Check if this is a top-level item (parent folder)
+        if item.parent() is None:
+            # This is a top-level folder, propagate state to all children
+            new_state = item.checkState(0)
+            
+            # Temporarily disconnect the signal to avoid recursive calls
+            self.folder_tree.itemChanged.disconnect(self.on_item_changed)
+            
+            try:
+                # Set all children to the same state
+                for i in range(item.childCount()):
+                    child = item.child(i)
+                    child.setCheckState(0, new_state)
+            finally:
+                # Reconnect the signal
+                self.folder_tree.itemChanged.connect(self.on_item_changed)
+    
     def count_images_in_folder(self, folder_path):
         """Count images in a specific folder (non-recursive)."""
         count = 0

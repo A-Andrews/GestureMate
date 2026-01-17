@@ -47,7 +47,8 @@ The folder picker now shows two columns:
 ### Managing Subfolders
 
 - Click the arrow/triangle next to a folder to expand/collapse it
-- Uncheck any subfolder you want to exclude from the session
+- Check or uncheck a parent folder to automatically check/uncheck all its subfolders
+- Uncheck any subfolder individually if you want to exclude it from the session
 - Keep the parent folder checked if you want images from the parent folder itself
 
 ### Removing Folders
