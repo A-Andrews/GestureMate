@@ -119,12 +119,15 @@ class SettingsDialog(QDialog):
         """Handle item checkbox state changes.
         
         When a top-level folder's checkbox is changed, propagate the state to all children.
+        Only top-level items trigger propagation to allow individual subfolder control.
         """
         # Only handle checkbox changes in column 0
         if column != 0:
             return
         
-        # Check if this is a top-level item (parent folder)
+        # Only propagate from top-level items (parent is None)
+        # This allows users to manually adjust individual subfolders after bulk operations
+        # and prevents infinite recursion when we programmatically update child items
         if item.parent() is None:
             # This is a top-level folder, propagate state to all children
             new_state = item.checkState(0)
