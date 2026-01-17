@@ -2,6 +2,13 @@
 
 A gesture drawing practice application for artists. GestureMate helps you practice figure drawing by displaying images from your chosen folders with customizable timers.
 
+## What's New
+
+- ✨ **Fixed Sound System**: Halfway notification now uses a reliable cross-platform WAV file instead of system beep
+- 🔄 **Image Rotation**: Rotate images 90° clockwise or counter-clockwise during your session
+- 🎨 **App Icon**: New custom icon for GestureMate (gesturemate.png and gesturemate.ico)
+- 📦 **Linux Packaging**: New `package.sh` script creates a standalone executable you can run without the command line
+
 ## Features
 
 - 📁 **Multiple Folder Support**: Load images from multiple directories
@@ -11,8 +18,8 @@ A gesture drawing practice application for artists. GestureMate helps you practi
 - ⏱️ **Customizable Timers**: Set duration per image and total session length (presets saved automatically)
 - ⬅️ **Image Navigation**: Move forward and backward through images
 - ⌨️ **Full Keyboard Support**: Complete hotkey support for hands-free operation
-- 🔄 **Image Transformations**: Flip horizontally, vertically, or convert to greyscale
-- 🔔 **Halfway Notification**: Optional audio beep at 50% of image time
+- 🔄 **Image Transformations**: Flip horizontally, vertically, rotate 90°, or convert to greyscale
+- 🔔 **Halfway Notification**: Optional audio beep at 50% of image time (now with reliable cross-platform sound)
 - 🚀 **Quick Start**: Start sessions immediately without configuring settings
 - 🖼️ **Smart Image Scaling**: Images automatically fit to your screen size
 - 🎨 **Clean Interface**: Simple, distraction-free dark theme
@@ -45,10 +52,28 @@ To add GestureMate to your application menu:
 
 ```bash
 cp gesturemate.desktop ~/.local/share/applications/
+cp gesturemate.png ~/.local/share/icons/
 chmod +x ~/.local/share/applications/gesturemate.desktop
 ```
 
 Make sure to edit the `Exec` line in the desktop file to point to the correct path.
+
+### Creating a Standalone Package (Linux)
+
+To create a standalone executable that doesn't require command-line launching:
+
+```bash
+./package.sh
+```
+
+This will create a `dist/` directory with a standalone executable. You can then:
+- Run `./dist/GestureMate` directly
+- Or use the launcher script: `./dist/run-gesturemate.sh`
+- Follow the instructions in `dist/README.txt` for desktop integration
+
+Requirements for packaging:
+- PyInstaller (will be installed automatically by the script)
+- All dependencies from requirements.txt
 
 ## Usage
 
@@ -82,7 +107,8 @@ chmod +x gesturemate.py
    - Use "Previous" to go back to the previous image
    - Use "Next Image" to skip to the next reference
    - Use "Pause" to take a break
-   - Use transformation buttons to flip images or convert to greyscale
+   - Use transformation buttons to flip, rotate images, or convert to greyscale
+   - Use "Reset Transform" to clear all transformations
    - Use "Stop" to end the session early
 
 ### Keyboard Shortcuts
@@ -100,6 +126,9 @@ chmod +x gesturemate.py
 - `H`: Flip Horizontal
 - `V`: Flip Vertical
 - `G`: Toggle Greyscale
+- `R`: Rotate Clockwise (90°)
+- `Shift+R`: Rotate Counter-Clockwise (90°)
+- `T`: Reset All Transformations
 
 #### Application
 - `Ctrl+S`: Open Settings
