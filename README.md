@@ -4,6 +4,7 @@ A gesture drawing practice application for artists. GestureMate helps you practi
 
 ## What's New
 
+- 🌳 **Enhanced Folder Picker**: Tree view with expandable subfolders and image counts for each folder/subfolder
 - ✨ **Fixed Sound System**: Halfway notification now uses a reliable cross-platform WAV file instead of system beep
 - 🔄 **Image Rotation**: Rotate images 90° clockwise or counter-clockwise during your session
 - 🎨 **App Icon**: New custom icon for GestureMate (gesturemate.png and gesturemate.ico)
@@ -12,8 +13,9 @@ A gesture drawing practice application for artists. GestureMate helps you practi
 ## Features
 
 - 📁 **Multiple Folder Support**: Load images from multiple directories
+- 🌳 **Subfolder Management**: See and manage subfolders in a tree view with individual checkboxes
 - ✅ **Persistent Settings**: Folder selections and timer presets are saved and can be toggled on/off
-- 📊 **Folder Statistics**: See how many images are loaded from each folder
+- 📊 **Detailed Folder Statistics**: See exactly how many images are in each folder and subfolder
 - 🔀 **Shuffle Control**: Choose to shuffle images or display them in order
 - ⏱️ **Customizable Timers**: Set duration per image and total session length (presets saved automatically)
 - ⬅️ **Image Navigation**: Move forward and backward through images
@@ -94,8 +96,11 @@ chmod +x gesturemate.py
 
 1. **Configure Settings** (Ctrl+S or File → Settings)
    - Click "Add Folder" to select directories containing your reference images
-   - Previously selected folders will be remembered and shown with checkboxes
-   - Toggle folders on/off to include/exclude them from the session
+   - **NEW**: See image counts displayed next to each folder
+   - **NEW**: When you add a folder, subfolders are automatically shown in a tree structure
+   - **NEW**: Expand/collapse folder trees to see subfolders with their individual image counts
+   - Toggle folders and subfolders on/off with checkboxes to include/exclude them from the session
+   - Previously selected folders will be remembered with their subfolder states
    - Set the duration per image (in seconds)
    - Set the total session duration (in minutes)
    - Choose whether to shuffle images (enabled by default)

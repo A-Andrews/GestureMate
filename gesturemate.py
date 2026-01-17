@@ -206,36 +206,91 @@ class SettingsDialog(QDialog):
     
     def load_saved_folders(self):
         """Load saved folders into the tree."""
+        # Group folders by parent-child relationships
+        parent_folders = {}
+        subfolder_states = {}
+        
+        # First pass: identify parent folders and their children
         for folder, enabled in self.saved_folders.items():
-            # Check if it's a top-level folder or already added
             folder_path = Path(folder)
             if not folder_path.exists():
                 continue
             
-            # Check if this folder is already in the tree
-            root = self.folder_tree.invisibleRootItem()
-            already_exists = False
-            for i in range(root.childCount()):
-                item = root.child(i)
-                if item.data(0, Qt.ItemDataRole.UserRole) == folder:
-                    already_exists = True
-                    break
+            # Check if this folder is a subfolder of any other saved folder
+            is_subfolder = False
+            for other_folder in self.saved_folders.keys():
+                if folder != other_folder:
+                    other_path = Path(other_folder)
+                    try:
+                        # Check if folder is a child of other_folder
+                        folder_path.relative_to(other_path)
+                        # It's a subfolder
+                        is_subfolder = True
+                        if other_folder not in parent_folders:
+                            parent_folders[other_folder] = []
+                        parent_folders[other_folder].append(folder)
+                        subfolder_states[folder] = enabled
+                        break
+                    except ValueError:
+                        # Not a subfolder
+                        pass
             
-            if already_exists:
+            if not is_subfolder:
+                # It's a top-level folder
+                if folder not in parent_folders:
+                    parent_folders[folder] = []
+        
+        # Second pass: create tree items for parent folders
+        for parent_folder in sorted(parent_folders.keys()):
+            parent_path = Path(parent_folder)
+            if not parent_path.exists():
                 continue
             
             # Count images
-            total_images = self.count_images_recursive(folder)
+            total_images = self.count_images_recursive(parent_folder)
             
-            # Create tree item
+            # Create tree item for parent
             folder_item = QTreeWidgetItem()
-            folder_item.setText(0, folder_path.name)
+            folder_item.setText(0, parent_path.name)
             folder_item.setText(1, str(total_images))
-            folder_item.setCheckState(0, Qt.CheckState.Checked if enabled else Qt.CheckState.Unchecked)
-            folder_item.setData(0, Qt.ItemDataRole.UserRole, folder)
-            folder_item.setToolTip(0, folder)
+            folder_item.setCheckState(0, Qt.CheckState.Checked if self.saved_folders.get(parent_folder, True) else Qt.CheckState.Unchecked)
+            folder_item.setData(0, Qt.ItemDataRole.UserRole, parent_folder)
+            folder_item.setToolTip(0, parent_folder)
+            
+            # Add subfolders if any
+            saved_subfolders = parent_folders[parent_folder]
+            if saved_subfolders:
+                # These are explicitly saved subfolders
+                for subfolder in sorted(saved_subfolders):
+                    subfolder_path = Path(subfolder)
+                    if not subfolder_path.exists():
+                        continue
+                    
+                    subfolder_images = self.count_images_recursive(subfolder)
+                    subfolder_item = QTreeWidgetItem()
+                    subfolder_item.setText(0, subfolder_path.name)
+                    subfolder_item.setText(1, str(subfolder_images))
+                    subfolder_item.setCheckState(0, Qt.CheckState.Checked if subfolder_states.get(subfolder, True) else Qt.CheckState.Unchecked)
+                    subfolder_item.setData(0, Qt.ItemDataRole.UserRole, subfolder)
+                    subfolder_item.setToolTip(0, subfolder)
+                    folder_item.addChild(subfolder_item)
+            else:
+                # Discover subfolders that weren't explicitly saved
+                discovered_subfolders = self.get_subfolders_with_images(parent_folder)
+                for subfolder in discovered_subfolders:
+                    subfolder_path = Path(subfolder)
+                    subfolder_images = self.count_images_recursive(subfolder)
+                    subfolder_item = QTreeWidgetItem()
+                    subfolder_item.setText(0, subfolder_path.name)
+                    subfolder_item.setText(1, str(subfolder_images))
+                    # Default to checked for newly discovered subfolders
+                    subfolder_item.setCheckState(0, Qt.CheckState.Checked)
+                    subfolder_item.setData(0, Qt.ItemDataRole.UserRole, subfolder)
+                    subfolder_item.setToolTip(0, subfolder)
+                    folder_item.addChild(subfolder_item)
             
             self.folder_tree.addTopLevelItem(folder_item)
+            folder_item.setExpanded(True)
             
     def remove_folder(self):
         """Remove selected folder from the tree."""
