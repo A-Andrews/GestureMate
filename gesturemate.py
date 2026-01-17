@@ -7,6 +7,7 @@ import sys
 import os
 import random
 import json
+import subprocess
 from pathlib import Path
 from typing import List
 
@@ -16,8 +17,8 @@ from PyQt6.QtWidgets import (
     QDialog, QDialogButtonBox, QGroupBox, QFormLayout, QMessageBox,
     QProgressBar, QCheckBox, QListWidgetItem
 )
-from PyQt6.QtCore import QTimer, Qt, QSize, QStandardPaths
-from PyQt6.QtGui import QPixmap, QPalette, QColor, QAction, QImage
+from PyQt6.QtCore import QTimer, Qt, QSize, QStandardPaths, QUrl
+from PyQt6.QtGui import QPixmap, QPalette, QColor, QAction, QImage, QTransform
 
 
 class SettingsDialog(QDialog):
@@ -171,6 +172,7 @@ class GestureMate(QMainWindow):
         self.flip_horizontal = False
         self.flip_vertical = False
         self.greyscale = False
+        self.rotation_angle = 0  # 0, 90, 180, or 270 degrees
         self.halfway_sound_played = False
         self.image_duration_half = 0  # Cache for halfway point
         
@@ -296,6 +298,23 @@ class GestureMate(QMainWindow):
         greyscale_action.triggered.connect(self.toggle_greyscale)
         transform_menu.addAction(greyscale_action)
         
+        transform_menu.addSeparator()
+        
+        rotate_cw_action = QAction("Rotate &Clockwise", self)
+        rotate_cw_action.setShortcut("R")
+        rotate_cw_action.triggered.connect(self.rotate_clockwise)
+        transform_menu.addAction(rotate_cw_action)
+        
+        rotate_ccw_action = QAction("Rotate C&ounter-Clockwise", self)
+        rotate_ccw_action.setShortcut("Shift+R")
+        rotate_ccw_action.triggered.connect(self.rotate_counter_clockwise)
+        transform_menu.addAction(rotate_ccw_action)
+        
+        reset_transform_action = QAction("Reset &Transformations", self)
+        reset_transform_action.setShortcut("T")
+        reset_transform_action.triggered.connect(self.reset_transformations)
+        transform_menu.addAction(reset_transform_action)
+        
         # Help menu
         help_menu = menubar.addMenu("&Help")
         
@@ -389,6 +408,21 @@ class GestureMate(QMainWindow):
         self.greyscale_btn.setCheckable(True)
         transform_layout.addWidget(self.greyscale_btn)
         
+        self.rotate_cw_btn = QPushButton("Rotate ↻")
+        self.rotate_cw_btn.clicked.connect(self.rotate_clockwise)
+        self.rotate_cw_btn.setEnabled(False)
+        transform_layout.addWidget(self.rotate_cw_btn)
+        
+        self.rotate_ccw_btn = QPushButton("Rotate ↺")
+        self.rotate_ccw_btn.clicked.connect(self.rotate_counter_clockwise)
+        self.rotate_ccw_btn.setEnabled(False)
+        transform_layout.addWidget(self.rotate_ccw_btn)
+        
+        self.reset_transform_btn = QPushButton("Reset Transform")
+        self.reset_transform_btn.clicked.connect(self.reset_transformations)
+        self.reset_transform_btn.setEnabled(False)
+        transform_layout.addWidget(self.reset_transform_btn)
+        
         layout.addLayout(transform_layout)
         
         panel.setLayout(layout)
@@ -404,8 +438,77 @@ class GestureMate(QMainWindow):
     
     def setup_sound(self):
         """Setup the sound effect for halfway notification."""
-        # Use system beep as a simple cross-platform solution
+        # Get the directory where the script is located
+        script_dir = Path(__file__).parent
+        self.beep_sound_path = script_dir / 'beep.wav'
+        
+        # If beep.wav doesn't exist, create it
+        if not self.beep_sound_path.exists():
+            self.create_beep_sound()
+        
         self.use_system_beep = True
+    
+    def create_beep_sound(self):
+        """Create a beep sound file if it doesn't exist."""
+        try:
+            import wave
+            import struct
+            import math
+            
+            duration = 0.2
+            frequency = 800
+            sample_rate = 44100
+            num_samples = int(duration * sample_rate)
+            
+            # Generate sine wave
+            samples = []
+            for i in range(num_samples):
+                value = int(32767 * 0.3 * math.sin(2 * math.pi * frequency * i / sample_rate))
+                samples.append(struct.pack('h', value))
+            
+            # Write to WAV file
+            with wave.open(str(self.beep_sound_path), 'w') as wav_file:
+                wav_file.setnchannels(1)  # Mono
+                wav_file.setsampwidth(2)  # 2 bytes per sample
+                wav_file.setframerate(sample_rate)
+                wav_file.writeframes(b''.join(samples))
+        except Exception as e:
+            print(f"Could not create beep sound: {e}")
+    
+    def play_beep_sound(self):
+        """Play the beep sound using available system tools."""
+        try:
+            # Try different methods to play the sound
+            if sys.platform == 'linux':
+                # Try common Linux audio players
+                for player in ['aplay', 'paplay', 'ffplay', 'play']:
+                    try:
+                        subprocess.Popen(
+                            [player, str(self.beep_sound_path)],
+                            stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL
+                        )
+                        return
+                    except FileNotFoundError:
+                        continue
+            elif sys.platform == 'darwin':  # macOS
+                subprocess.Popen(
+                    ['afplay', str(self.beep_sound_path)],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL
+                )
+                return
+            elif sys.platform == 'win32':  # Windows
+                import winsound
+                winsound.PlaySound(str(self.beep_sound_path), winsound.SND_FILENAME | winsound.SND_ASYNC)
+                return
+            
+            # Fallback: try QApplication.beep()
+            QApplication.beep()
+        except Exception as e:
+            print(f"Could not play beep sound: {e}")
+            # Final fallback: print to console
+            print('\a')  # ASCII bell character
         
     def set_dark_theme(self):
         """Apply a dark theme to the application."""
@@ -530,6 +633,7 @@ class GestureMate(QMainWindow):
         self.flip_horizontal = False
         self.flip_vertical = False
         self.greyscale = False
+        self.rotation_angle = 0
         self.flip_h_btn.setChecked(False)
         self.flip_v_btn.setChecked(False)
         self.greyscale_btn.setChecked(False)
@@ -544,6 +648,9 @@ class GestureMate(QMainWindow):
         self.flip_h_btn.setEnabled(True)
         self.flip_v_btn.setEnabled(True)
         self.greyscale_btn.setEnabled(True)
+        self.rotate_cw_btn.setEnabled(True)
+        self.rotate_ccw_btn.setEnabled(True)
+        self.reset_transform_btn.setEnabled(True)
         
         # Start timers
         self.session_timer.start(1000)  # 1 second interval
@@ -578,6 +685,9 @@ class GestureMate(QMainWindow):
         self.flip_h_btn.setEnabled(False)
         self.flip_v_btn.setEnabled(False)
         self.greyscale_btn.setEnabled(False)
+        self.rotate_cw_btn.setEnabled(False)
+        self.rotate_ccw_btn.setEnabled(False)
+        self.reset_transform_btn.setEnabled(False)
         
         self.image_timer_label.setText("Image: --:--")
         self.session_timer_label.setText("Session: --:--")
@@ -623,6 +733,30 @@ class GestureMate(QMainWindow):
         self.greyscale = not self.greyscale
         if self.is_session_active and self.images:
             self.display_current_image()
+    
+    def rotate_clockwise(self):
+        """Rotate image 90 degrees clockwise."""
+        if self.is_session_active and self.images:
+            self.rotation_angle = (self.rotation_angle - 90) % 360
+            self.display_current_image()
+    
+    def rotate_counter_clockwise(self):
+        """Rotate image 90 degrees counter-clockwise."""
+        if self.is_session_active and self.images:
+            self.rotation_angle = (self.rotation_angle + 90) % 360
+            self.display_current_image()
+    
+    def reset_transformations(self):
+        """Reset all image transformations."""
+        if self.is_session_active and self.images:
+            self.flip_horizontal = False
+            self.flip_vertical = False
+            self.greyscale = False
+            self.rotation_angle = 0
+            self.flip_h_btn.setChecked(False)
+            self.flip_v_btn.setChecked(False)
+            self.greyscale_btn.setChecked(False)
+            self.display_current_image()
         
     def update_session_timer(self):
         """Update the session timer."""
@@ -658,7 +792,7 @@ class GestureMate(QMainWindow):
             self.image_time_remaining <= self.image_duration_half):
             self.halfway_sound_played = True
             try:
-                QApplication.beep()
+                self.play_beep_sound()
             except Exception as e:
                 print(f"Error playing sound: {e}")
         
@@ -679,12 +813,18 @@ class GestureMate(QMainWindow):
             return
         
         # Apply transformations
-        if self.greyscale or self.flip_horizontal or self.flip_vertical:
+        if self.greyscale or self.flip_horizontal or self.flip_vertical or self.rotation_angle != 0:
             image = pixmap.toImage()
             
             # Apply greyscale
             if self.greyscale:
                 image = image.convertToFormat(QImage.Format.Format_Grayscale8)
+            
+            # Apply rotation first
+            if self.rotation_angle != 0:
+                transform = QTransform()
+                transform.rotate(self.rotation_angle)
+                image = image.transformed(transform, Qt.TransformationMode.SmoothTransformation)
             
             # Apply flips
             if self.flip_horizontal:
@@ -732,6 +872,9 @@ class GestureMate(QMainWindow):
             "<li>H: Flip Horizontal</li>"
             "<li>V: Flip Vertical</li>"
             "<li>G: Greyscale</li>"
+            "<li>R: Rotate Clockwise</li>"
+            "<li>Shift+R: Rotate Counter-Clockwise</li>"
+            "<li>T: Reset Transformations</li>"
             "</ul>"
         )
     
