@@ -25,17 +25,31 @@ fi
 
 echo "✓ Python 3 found"
 
+# Warn about package installation
+if [ -z "$VIRTUAL_ENV" ]; then
+    echo "⚠ WARNING: Not running in a virtual environment."
+    echo "  Packages will be installed globally with --user flag."
+    read -p "  Continue? (y/N) " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "Aborted. Consider creating a virtual environment first:"
+        echo "  python3 -m venv venv"
+        echo "  source venv/bin/activate"
+        exit 1
+    fi
+fi
+
 # Check/Install PyInstaller
 if ! python3 -c "import PyInstaller" 2>/dev/null; then
     echo "Installing PyInstaller..."
-    pip install --user pyinstaller
+    pip install pyinstaller
 fi
 
 echo "✓ PyInstaller ready"
 
 # Install dependencies
 echo "Installing dependencies..."
-pip install --user -r requirements.txt
+pip install -r requirements.txt
 
 echo "✓ Dependencies installed"
 

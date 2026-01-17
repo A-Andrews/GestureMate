@@ -478,26 +478,28 @@ class GestureMate(QMainWindow):
     def play_beep_sound(self):
         """Play the beep sound using available system tools."""
         try:
+            import shutil
             # Try different methods to play the sound
             if sys.platform == 'linux':
                 # Try common Linux audio players
                 for player in ['aplay', 'paplay', 'ffplay', 'play']:
-                    try:
+                    player_path = shutil.which(player)
+                    if player_path:
                         subprocess.Popen(
-                            [player, str(self.beep_sound_path)],
+                            [player_path, str(self.beep_sound_path)],
                             stdout=subprocess.DEVNULL,
                             stderr=subprocess.DEVNULL
                         )
                         return
-                    except FileNotFoundError:
-                        continue
             elif sys.platform == 'darwin':  # macOS
-                subprocess.Popen(
-                    ['afplay', str(self.beep_sound_path)],
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL
-                )
-                return
+                afplay_path = shutil.which('afplay')
+                if afplay_path:
+                    subprocess.Popen(
+                        [afplay_path, str(self.beep_sound_path)],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL
+                    )
+                    return
             elif sys.platform == 'win32':  # Windows
                 import winsound
                 winsound.PlaySound(str(self.beep_sound_path), winsound.SND_FILENAME | winsound.SND_ASYNC)
