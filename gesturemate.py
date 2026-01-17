@@ -15,10 +15,17 @@ from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QFileDialog, QSpinBox, QListWidget,
     QDialog, QDialogButtonBox, QGroupBox, QFormLayout, QMessageBox,
-    QProgressBar, QCheckBox, QListWidgetItem
+    QProgressBar, QCheckBox, QListWidgetItem, QTreeWidget, QTreeWidgetItem
 )
 from PyQt6.QtCore import QTimer, Qt, QSize, QStandardPaths, QUrl
 from PyQt6.QtGui import QPixmap, QPalette, QColor, QAction, QImage, QTransform
+
+
+# Supported image formats (module-level constant)
+SUPPORTED_IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.bmp', '.gif', '.webp'}
+
+# Maximum number of files to check when scanning folders (prevents UI freezing)
+MAX_FILES_TO_CHECK = 5000
 
 
 class SettingsDialog(QDialog):
@@ -44,8 +51,11 @@ class SettingsDialog(QDialog):
         folder_group = QGroupBox("Image Folders")
         folder_layout = QVBoxLayout()
         
-        self.folder_list = QListWidget()
-        folder_layout.addWidget(self.folder_list)
+        self.folder_tree = QTreeWidget()
+        self.folder_tree.setHeaderLabels(["Folder", "Images"])
+        self.folder_tree.setColumnWidth(0, 400)
+        self.folder_tree.itemChanged.connect(self.on_item_changed)
+        folder_layout.addWidget(self.folder_tree)
         
         folder_btn_layout = QHBoxLayout()
         add_folder_btn = QPushButton("Add Folder")
@@ -105,45 +115,289 @@ class SettingsDialog(QDialog):
         
         self.setLayout(layout)
         
+    def on_item_changed(self, item, column):
+        """Handle item checkbox state changes.
+        
+        When a top-level folder's checkbox is changed, propagate the state to all children.
+        Only top-level items trigger propagation to allow individual subfolder control.
+        """
+        # Only handle checkbox changes in column 0
+        if column != 0:
+            return
+        
+        # Only propagate from top-level items (parent is None)
+        # This allows users to manually adjust individual subfolders after bulk operations
+        # and prevents infinite recursion when we programmatically update child items
+        if item.parent() is None:
+            # This is a top-level folder, propagate state to all children
+            new_state = item.checkState(0)
+            
+            # Block signals to avoid recursive calls
+            self.folder_tree.blockSignals(True)
+            
+            try:
+                # Set all children to the same state
+                for i in range(item.childCount()):
+                    child = item.child(i)
+                    child.setCheckState(0, new_state)
+            finally:
+                # Unblock signals
+                self.folder_tree.blockSignals(False)
+    
+    def count_images_in_folder(self, folder_path):
+        """Count images in a specific folder (non-recursive)."""
+        count = 0
+        folder = Path(folder_path)
+        if folder.exists() and folder.is_dir():
+            for file_path in folder.iterdir():
+                if file_path.is_file() and file_path.suffix.lower() in SUPPORTED_IMAGE_EXTENSIONS:
+                    count += 1
+        return count
+    
+    def get_subfolders_with_images(self, parent_folder):
+        """Get all subfolders that contain images (directly or in sub-subfolders)."""
+        subfolders = []
+        parent_path = Path(parent_folder)
+        
+        if not parent_path.exists():
+            return subfolders
+        
+        # Get immediate subfolders
+        for item in parent_path.iterdir():
+            if item.is_dir():
+                # Check if this subfolder or any of its descendants has images
+                # Limit iteration to prevent excessive scanning
+                has_images = False
+                try:
+                    file_count = 0
+                    for file_path in item.rglob('*'):
+                        file_count += 1
+                        if file_count > MAX_FILES_TO_CHECK:
+                            break
+                        if file_path.is_file() and file_path.suffix.lower() in SUPPORTED_IMAGE_EXTENSIONS:
+                            has_images = True
+                            break
+                except (PermissionError, OSError):
+                    # Skip folders we can't access
+                    continue
+                
+                if has_images:
+                    subfolders.append(str(item))
+        
+        return sorted(subfolders)
+    
+    def count_images_recursive(self, folder_path):
+        """Count all images in a folder recursively.
+        
+        Note: Uses a file count limit to prevent UI freezing on very large folders.
+        """
+        count = 0
+        folder = Path(folder_path)
+        if folder.exists() and folder.is_dir():
+            try:
+                # Use single rglob('*') and filter by extension for efficiency
+                # Limit iteration to prevent UI freezing on very large folders
+                file_count = 0
+                for file_path in folder.rglob('*'):
+                    file_count += 1
+                    if file_count > MAX_FILES_TO_CHECK:
+                        # If we hit the limit, return approximate count with indicator
+                        # This prevents UI freezing but gives user an idea of size
+                        return count
+                    if file_path.is_file() and file_path.suffix.lower() in SUPPORTED_IMAGE_EXTENSIONS:
+                        count += 1
+            except (PermissionError, OSError):
+                # Skip folders we can't access
+                pass
+        return count
+    
     def add_folder(self):
-        """Add a folder to the list."""
+        """Add a folder to the tree with subfolders."""
         folder = QFileDialog.getExistingDirectory(
             self, "Select Image Folder"
         )
-        if folder and folder not in self.folders:
-            self.folders.append(folder)
-            item = QListWidgetItem(folder)
-            item.setCheckState(Qt.CheckState.Checked)
-            self.folder_list.addItem(item)
+        if not folder:
+            return
+        
+        # Check if folder already exists in tree
+        root = self.folder_tree.invisibleRootItem()
+        for i in range(root.childCount()):
+            item = root.child(i)
+            if item.data(0, Qt.ItemDataRole.UserRole) == folder:
+                QMessageBox.information(self, "Folder Exists", "This folder has already been added.")
+                return
+        
+        # Count images in the main folder
+        total_images = self.count_images_recursive(folder)
+        
+        if total_images == 0:
+            response = QMessageBox.question(
+                self, "No Images Found",
+                f"No images found in {Path(folder).name}. Add it anyway?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            if response == QMessageBox.StandardButton.No:
+                return
+        
+        # Create tree item for the main folder
+        folder_item = QTreeWidgetItem()
+        folder_item.setText(0, Path(folder).name)
+        folder_item.setText(1, str(total_images))
+        folder_item.setCheckState(0, Qt.CheckState.Checked)
+        folder_item.setData(0, Qt.ItemDataRole.UserRole, folder)
+        folder_item.setToolTip(0, folder)
+        
+        # Get subfolders
+        subfolders = self.get_subfolders_with_images(folder)
+        
+        # Add subfolder items
+        for subfolder in subfolders:
+            # Count images for this subfolder
+            subfolder_images = self.count_images_recursive(subfolder)
+            subfolder_item = QTreeWidgetItem()
+            subfolder_item.setText(0, Path(subfolder).name)
+            subfolder_item.setText(1, str(subfolder_images))
+            subfolder_item.setCheckState(0, Qt.CheckState.Checked)
+            subfolder_item.setData(0, Qt.ItemDataRole.UserRole, subfolder)
+            subfolder_item.setToolTip(0, subfolder)
+            folder_item.addChild(subfolder_item)
+        
+        self.folder_tree.addTopLevelItem(folder_item)
+        folder_item.setExpanded(True)
     
     def load_saved_folders(self):
-        """Load saved folders into the list."""
+        """Load saved folders into the tree."""
+        # Group folders by parent-child relationships
+        parent_folders = {}
+        subfolder_states = {}
+        
+        # First pass: identify parent folders and their children
         for folder, enabled in self.saved_folders.items():
-            if folder not in self.folders:
-                self.folders.append(folder)
-                item = QListWidgetItem(folder)
-                item.setCheckState(Qt.CheckState.Checked if enabled else Qt.CheckState.Unchecked)
-                self.folder_list.addItem(item)
+            folder_path = Path(folder)
+            if not folder_path.exists():
+                continue
+            
+            # Check if this folder is a subfolder of any other saved folder
+            is_subfolder = False
+            for other_folder in self.saved_folders.keys():
+                if folder != other_folder:
+                    other_path = Path(other_folder)
+                    try:
+                        # Check if folder is a child of other_folder
+                        # relative_to() raises ValueError if paths are unrelated
+                        folder_path.relative_to(other_path)
+                        # It's a subfolder
+                        is_subfolder = True
+                        if other_folder not in parent_folders:
+                            parent_folders[other_folder] = []
+                        parent_folders[other_folder].append(folder)
+                        subfolder_states[folder] = enabled
+                        break
+                    except ValueError:
+                        # Not a subfolder - paths are unrelated
+                        pass
+            
+            if not is_subfolder:
+                # It's a top-level folder
+                if folder not in parent_folders:
+                    parent_folders[folder] = []
+        
+        # Second pass: create tree items for parent folders
+        for parent_folder in sorted(parent_folders.keys()):
+            parent_path = Path(parent_folder)
+            if not parent_path.exists():
+                continue
+            
+            # Count images
+            total_images = self.count_images_recursive(parent_folder)
+            
+            # Create tree item for parent
+            folder_item = QTreeWidgetItem()
+            folder_item.setText(0, parent_path.name)
+            folder_item.setText(1, str(total_images))
+            folder_item.setCheckState(0, Qt.CheckState.Checked if self.saved_folders.get(parent_folder, True) else Qt.CheckState.Unchecked)
+            folder_item.setData(0, Qt.ItemDataRole.UserRole, parent_folder)
+            folder_item.setToolTip(0, parent_folder)
+            
+            # Add subfolders if any
+            saved_subfolders = parent_folders[parent_folder]
+            if saved_subfolders:
+                # These are explicitly saved subfolders
+                for subfolder in sorted(saved_subfolders):
+                    subfolder_path = Path(subfolder)
+                    if not subfolder_path.exists():
+                        continue
+                    
+                    subfolder_images = self.count_images_recursive(subfolder)
+                    subfolder_item = QTreeWidgetItem()
+                    subfolder_item.setText(0, subfolder_path.name)
+                    subfolder_item.setText(1, str(subfolder_images))
+                    subfolder_item.setCheckState(0, Qt.CheckState.Checked if subfolder_states.get(subfolder, True) else Qt.CheckState.Unchecked)
+                    subfolder_item.setData(0, Qt.ItemDataRole.UserRole, subfolder)
+                    subfolder_item.setToolTip(0, subfolder)
+                    folder_item.addChild(subfolder_item)
+            else:
+                # Discover subfolders that weren't explicitly saved
+                discovered_subfolders = self.get_subfolders_with_images(parent_folder)
+                for subfolder in discovered_subfolders:
+                    subfolder_path = Path(subfolder)
+                    subfolder_images = self.count_images_recursive(subfolder)
+                    subfolder_item = QTreeWidgetItem()
+                    subfolder_item.setText(0, subfolder_path.name)
+                    subfolder_item.setText(1, str(subfolder_images))
+                    # Default to checked for newly discovered subfolders
+                    subfolder_item.setCheckState(0, Qt.CheckState.Checked)
+                    subfolder_item.setData(0, Qt.ItemDataRole.UserRole, subfolder)
+                    subfolder_item.setToolTip(0, subfolder)
+                    folder_item.addChild(subfolder_item)
+            
+            self.folder_tree.addTopLevelItem(folder_item)
+            folder_item.setExpanded(True)
             
     def remove_folder(self):
-        """Remove selected folder from the list."""
-        current_row = self.folder_list.currentRow()
-        if current_row >= 0:
-            self.folder_list.takeItem(current_row)
-            self.folders.pop(current_row)
+        """Remove selected folder from the tree."""
+        current_item = self.folder_tree.currentItem()
+        if current_item:
+            # If it's a child item, remove from parent
+            parent = current_item.parent()
+            if parent:
+                parent.removeChild(current_item)
+            else:
+                # It's a top-level item
+                index = self.folder_tree.indexOfTopLevelItem(current_item)
+                self.folder_tree.takeTopLevelItem(index)
             
     def get_settings(self):
         """Return the current settings."""
-        # Get enabled folders only
+        # Get enabled folders from tree
         enabled_folders = []
         all_folders = {}
-        for i in range(self.folder_list.count()):
-            item = self.folder_list.item(i)
-            folder = item.text()
-            is_checked = item.checkState() == Qt.CheckState.Checked
-            all_folders[folder] = is_checked
-            if is_checked:
-                enabled_folders.append(folder)
+        
+        root = self.folder_tree.invisibleRootItem()
+        for i in range(root.childCount()):
+            item = root.child(i)
+            folder_path = item.data(0, Qt.ItemDataRole.UserRole)
+            is_checked = item.checkState(0) == Qt.CheckState.Checked
+            
+            # For parent folders, if checked and has no children, add the whole folder
+            if item.childCount() == 0:
+                all_folders[folder_path] = is_checked
+                if is_checked:
+                    enabled_folders.append(folder_path)
+            else:
+                # If has children, check each child
+                has_checked_children = False
+                for j in range(item.childCount()):
+                    child_item = item.child(j)
+                    child_folder = child_item.data(0, Qt.ItemDataRole.UserRole)
+                    child_checked = child_item.checkState(0) == Qt.CheckState.Checked
+                    all_folders[child_folder] = child_checked
+                    if child_checked:
+                        enabled_folders.append(child_folder)
+                        has_checked_children = True
+                
+                # Also store the parent folder state for persistence
+                all_folders[folder_path] = is_checked
         
         return {
             'folders': enabled_folders,
@@ -180,9 +434,6 @@ class GestureMate(QMainWindow):
         self.image_duration = 60  # 60 seconds default
         self.session_duration = 1800  # 30 minutes default
         self.halfway_sound_enabled = True
-        
-        # Supported image formats
-        self.image_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.gif', '.webp'}
         
         # Load saved settings
         self.config_file = self.get_config_file_path()
@@ -590,7 +841,7 @@ class GestureMate(QMainWindow):
             if folder_path.exists():
                 folder_images = []
                 for file_path in folder_path.rglob('*'):
-                    if file_path.is_file() and file_path.suffix.lower() in self.image_extensions:
+                    if file_path.is_file() and file_path.suffix.lower() in SUPPORTED_IMAGE_EXTENSIONS:
                         folder_images.append(str(file_path))
                 
                 # Track count per folder
