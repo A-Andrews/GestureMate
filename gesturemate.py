@@ -62,9 +62,26 @@ class SettingsDialog(QDialog):
         add_folder_btn.clicked.connect(self.add_folder)
         remove_folder_btn = QPushButton("Remove Selected")
         remove_folder_btn.clicked.connect(self.remove_folder)
+        refresh_btn = QPushButton("🔄 Refresh")
+        refresh_btn.clicked.connect(self.refresh_folders)
+        refresh_btn.setToolTip("Refresh folders to detect newly added subfolders")
+        # Add a subtle highlight style to the refresh button
+        refresh_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #3a5f7d;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #4a7fa0;
+            }
+            QPushButton:pressed {
+                background-color: #2a4f6d;
+            }
+        """)
         
         folder_btn_layout.addWidget(add_folder_btn)
         folder_btn_layout.addWidget(remove_folder_btn)
+        folder_btn_layout.addWidget(refresh_btn)
         folder_layout.addLayout(folder_btn_layout)
         
         folder_group.setLayout(folder_layout)
@@ -366,6 +383,86 @@ class SettingsDialog(QDialog):
                 # It's a top-level item
                 index = self.folder_tree.indexOfTopLevelItem(current_item)
                 self.folder_tree.takeTopLevelItem(index)
+    
+    def refresh_folders(self):
+        """Refresh the folder tree to detect newly added subfolders."""
+        # Store current checkbox states
+        current_states = {}
+        root = self.folder_tree.invisibleRootItem()
+        for i in range(root.childCount()):
+            item = root.child(i)
+            folder_path = item.data(0, Qt.ItemDataRole.UserRole)
+            current_states[folder_path] = item.checkState(0) == Qt.CheckState.Checked
+            
+            # Store child states
+            for j in range(item.childCount()):
+                child_item = item.child(j)
+                child_folder = child_item.data(0, Qt.ItemDataRole.UserRole)
+                current_states[child_folder] = child_item.checkState(0) == Qt.CheckState.Checked
+        
+        # Clear the tree
+        self.folder_tree.clear()
+        
+        # Reload folders with preserved states
+        parent_folders = {}
+        subfolder_states = {}
+        
+        # Identify parent folders from current states
+        for folder in current_states.keys():
+            folder_path = Path(folder)
+            if not folder_path.exists():
+                continue
+            
+            is_subfolder = False
+            for other_folder in current_states.keys():
+                if folder != other_folder:
+                    other_path = Path(other_folder)
+                    try:
+                        folder_path.relative_to(other_path)
+                        is_subfolder = True
+                        if other_folder not in parent_folders:
+                            parent_folders[other_folder] = []
+                        break
+                    except ValueError:
+                        pass
+            
+            if not is_subfolder:
+                if folder not in parent_folders:
+                    parent_folders[folder] = []
+        
+        # Recreate tree items with current states
+        for parent_folder in sorted(parent_folders.keys()):
+            parent_path = Path(parent_folder)
+            if not parent_path.exists():
+                continue
+            
+            # Count images
+            total_images = self.count_images_recursive(parent_folder)
+            
+            # Create tree item for parent
+            folder_item = QTreeWidgetItem()
+            folder_item.setText(0, parent_path.name)
+            folder_item.setText(1, str(total_images))
+            folder_item.setCheckState(0, Qt.CheckState.Checked if current_states.get(parent_folder, True) else Qt.CheckState.Unchecked)
+            folder_item.setData(0, Qt.ItemDataRole.UserRole, parent_folder)
+            folder_item.setToolTip(0, parent_folder)
+            
+            # Discover all subfolders (including newly added ones)
+            discovered_subfolders = self.get_subfolders_with_images(parent_folder)
+            for subfolder in discovered_subfolders:
+                subfolder_path = Path(subfolder)
+                subfolder_images = self.count_images_recursive(subfolder)
+                subfolder_item = QTreeWidgetItem()
+                subfolder_item.setText(0, subfolder_path.name)
+                subfolder_item.setText(1, str(subfolder_images))
+                # Use existing state if available, otherwise default to checked
+                subfolder_item.setCheckState(0, Qt.CheckState.Checked if current_states.get(subfolder, True) else Qt.CheckState.Unchecked)
+                subfolder_item.setData(0, Qt.ItemDataRole.UserRole, subfolder)
+                subfolder_item.setToolTip(0, subfolder)
+                folder_item.addChild(subfolder_item)
+            
+            self.folder_tree.addTopLevelItem(folder_item)
+            folder_item.setExpanded(True)
             
     def get_settings(self):
         """Return the current settings."""
@@ -780,6 +877,29 @@ class GestureMate(QMainWindow):
         palette.setColor(QPalette.ColorRole.Highlight, QColor(42, 130, 218))
         palette.setColor(QPalette.ColorRole.HighlightedText, Qt.GlobalColor.black)
         self.setPalette(palette)
+        
+        # Add subtle hover effects to buttons
+        self.setStyleSheet("""
+            QPushButton:hover:!pressed {
+                background-color: #5a5a5a;
+                border: 1px solid #2a82da;
+            }
+            QPushButton:pressed {
+                background-color: #404040;
+            }
+            QPushButton:checked {
+                background-color: #2a82da;
+                font-weight: bold;
+            }
+            QProgressBar {
+                border: 1px solid #444;
+                border-radius: 3px;
+                text-align: center;
+            }
+            QProgressBar::chunk {
+                background-color: #2a82da;
+            }
+        """)
         
     def show_settings(self):
         """Show the settings dialog."""
