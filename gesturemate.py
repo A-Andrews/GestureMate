@@ -405,7 +405,6 @@ class SettingsDialog(QDialog):
         
         # Reload folders with preserved states
         parent_folders = {}
-        subfolder_states = {}
         
         # Identify parent folders from current states
         for folder in current_states.keys():
