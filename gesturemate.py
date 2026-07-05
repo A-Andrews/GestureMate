@@ -18,7 +18,7 @@ from PyQt6.QtWidgets import (
     QProgressBar, QCheckBox, QListWidgetItem, QTreeWidget, QTreeWidgetItem
 )
 from PyQt6.QtCore import QTimer, Qt, QSize, QStandardPaths, QUrl
-from PyQt6.QtGui import QPixmap, QPalette, QColor, QAction, QImage, QTransform
+from PyQt6.QtGui import QPixmap, QPalette, QColor, QAction, QImage, QTransform, QIcon
 
 
 # Supported image formats (module-level constant)
@@ -1286,7 +1286,11 @@ def main():
     """Main entry point for the application."""
     app = QApplication(sys.argv)
     app.setApplicationName("GestureMate")
-    
+
+    icon_path = Path(__file__).parent / 'gesturemate.png'
+    if icon_path.exists():
+        app.setWindowIcon(QIcon(str(icon_path)))
+
     window = GestureMate()
     window.show()
     

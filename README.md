@@ -29,13 +29,25 @@ A gesture drawing practice application for artists. GestureMate helps you practi
 
 ## Installation
 
-### Prerequisites
+### Download (Recommended)
+
+Grab the latest standalone Linux build from the [releases page](https://github.com/A-Andrews/GestureMate/releases/latest) — no Python installation needed:
+
+```bash
+mkdir GestureMate && tar -xzf GestureMate-*-linux-x86_64.tar.gz -C GestureMate
+cd GestureMate
+./GestureMate
+```
+
+### Running from Source
+
+#### Prerequisites
 
 - Python 3.7 or higher
 - pip (Python package manager)
 - PyQt6 dependencies (usually pre-installed on most Linux distributions)
 
-### Quick Start
+#### Quick Start
 
 1. Clone the repository:
 ```bash

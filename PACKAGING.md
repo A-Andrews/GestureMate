@@ -65,11 +65,23 @@ GestureMate should now appear in your application menu under Graphics/Education.
 The entire `dist/` directory can be zipped and distributed to other users:
 
 ```bash
-cd dist
-tar -czf GestureMate-Linux.tar.gz *
+tar -czf GestureMate-1.0-linux-x86_64.tar.gz -C dist .
 ```
 
-Users can then extract and run without needing to install Python or any dependencies.
+Users can then extract and run without needing to install Python or any dependencies. The tarball can be uploaded anywhere — your website, a file host, or a GitHub release.
+
+### Automated GitHub Releases
+
+A GitHub Actions workflow (`.github/workflows/release.yml`) builds and publishes releases automatically. To cut a release, push a version tag:
+
+```bash
+git tag v1.0
+git push origin v1.0
+```
+
+GitHub Actions will build the standalone executable on Ubuntu 22.04 (for broad glibc compatibility), package it as `GestureMate-v1.0-linux-x86_64.tar.gz`, and attach it to a new GitHub release with auto-generated release notes. The release page (`https://github.com/A-Andrews/GestureMate/releases/latest`) is a stable link you can put on your website.
+
+Note: PyInstaller binaries only run on the architecture and OS family they were built for. The workflow produces a Linux x86_64 binary; add build matrix entries for other targets if needed.
 
 ## Requirements for Building
 

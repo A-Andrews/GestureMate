@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2b2640"/>
+      <stop offset="1" stop-color="#1a1726"/>
+    </linearGradient>
+    <linearGradient id="stroke" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffb15c"/>
+      <stop offset="1" stop-color="#ff6b35"/>
+    </linearGradient>
+  </defs>
+
+  <!-- rounded-square app tile -->
+  <rect x="8" y="8" width="496" height="496" rx="112" fill="url(#bg)"/>
+
+  <!-- subtle timer arc -->
+  <g fill="none" stroke="#8f86b8" stroke-opacity="0.45" stroke-width="14" stroke-linecap="round">
+    <path d="M 256 46 A 210 210 0 1 1 107 107"/>
+  </g>
+  <circle cx="107" cy="107" r="16" fill="#e8e2ff"/>
+
+  <!-- gesture figure: quick sweeping strokes -->
+  <g fill="none" stroke="url(#stroke)" stroke-linecap="round">
+    <!-- head -->
+    <circle cx="298" cy="138" r="36" fill="url(#stroke)" stroke="none"/>
+    <!-- line of action: spine -->
+    <path d="M 290 185 C 262 225, 252 275, 272 330" stroke-width="30"/>
+    <!-- raised arm -->
+    <path d="M 283 205 C 328 188, 375 152, 404 102" stroke-width="24"/>
+    <!-- lower arm -->
+    <path d="M 278 222 C 238 242, 196 252, 152 240" stroke-width="24"/>
+    <!-- back leg -->
+    <path d="M 272 330 C 300 382, 334 424, 378 452" stroke-width="26"/>
+    <!-- front leg -->
+    <path d="M 272 330 C 246 388, 214 428, 168 452" stroke-width="26"/>
+  </g>
+</svg>

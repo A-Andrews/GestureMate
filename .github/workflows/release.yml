@@ -1,0 +1,47 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-linux:
+    # Older LTS keeps the glibc requirement low so the binary runs on more distros
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libegl1 libgl1 libxkbcommon-x11-0
+          pip install -r requirements.txt pyinstaller
+
+      - name: Build executable
+        run: |
+          pyinstaller --clean --noconfirm --onefile --windowed \
+            --name GestureMate \
+            --add-data "beep.wav:." \
+            --add-data "gesturemate.png:." \
+            --icon gesturemate.ico \
+            gesturemate.py
+
+      - name: Assemble package
+        run: |
+          cp gesturemate.png gesturemate.desktop dist/
+          cp USER_GUIDE.md dist/README.md
+          tar -czf GestureMate-${{ github.ref_name }}-linux-x86_64.tar.gz -C dist .
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: GestureMate-${{ github.ref_name }}-linux-x86_64.tar.gz
+          generate_release_notes: true
