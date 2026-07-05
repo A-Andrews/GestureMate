@@ -2,6 +2,8 @@
 
 A gesture drawing practice application for artists. GestureMate helps you practice figure drawing by displaying images from your chosen folders with customizable timers.
 
+![GestureMate demo — a timed gesture drawing session with image navigation and transformations](promo/gesturemate-demo.gif)
+
 ## What's New
 
 - 🌳 **Enhanced Folder Picker**: Tree view with expandable subfolders and image counts for each folder/subfolder
@@ -26,6 +28,22 @@ A gesture drawing practice application for artists. GestureMate helps you practi
 - 🖼️ **Smart Image Scaling**: Images automatically fit to your screen size
 - 🎨 **Clean Interface**: Simple, distraction-free dark theme
 - 🖥️ **Cross-Platform**: Standalone builds for Linux, Windows, and macOS
+
+## Screenshots
+
+**A session in progress** — distraction-free dark interface with per-image and session timers:
+
+![Session in progress](promo/screenshot-session.png)
+
+**Image transformations** — flip, rotate, or convert to greyscale mid-session:
+
+![Greyscale and horizontal flip applied to the current image](promo/screenshot-transforms.png)
+
+**Session settings** — folder tree with per-subfolder image counts, timers, and session options:
+
+![Settings dialog with expandable folder tree](promo/screenshot-settings.png)
+
+*Artwork shown: public-domain drawings by Rembrandt, Dürer, and Watteau, via Wikimedia Commons.*
 
 ## Installation
 
