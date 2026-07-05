@@ -40,8 +40,109 @@ jobs:
           cp USER_GUIDE.md dist/README.md
           tar -czf GestureMate-${{ github.ref_name }}-linux-x86_64.tar.gz -C dist .
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-x86_64
+          path: GestureMate-*.tar.gz
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt pyinstaller
+
+      # Note: --add-data uses ";" as the separator on Windows
+      - name: Build executable
+        run: >-
+          pyinstaller --clean --noconfirm --onefile --windowed
+          --name GestureMate
+          --add-data "beep.wav;."
+          --add-data "gesturemate.png;."
+          --icon gesturemate.ico
+          gesturemate.py
+
+      - name: Assemble package
+        run: |
+          Copy-Item USER_GUIDE.md dist/README.md
+          Compress-Archive -Path dist/* -DestinationPath GestureMate-${{ github.ref_name }}-windows-x86_64.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-x86_64
+          path: GestureMate-*.zip
+
+  build-macos:
+    strategy:
+      matrix:
+        include:
+          - runner: macos-latest
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x86_64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # Pillow lets PyInstaller convert the PNG icon to the .icns macOS needs
+      - name: Install dependencies
+        run: pip install -r requirements.txt pyinstaller pillow
+
+      - name: Build app bundle
+        run: |
+          pyinstaller --clean --noconfirm --onefile --windowed \
+            --name GestureMate \
+            --add-data "beep.wav:." \
+            --add-data "gesturemate.png:." \
+            --icon gesturemate.png \
+            --osx-bundle-identifier com.gesturemate.app \
+            gesturemate.py
+
+      # Ad-hoc signature; the app is not notarized, so first launch needs
+      # right-click -> Open (see release notes)
+      - name: Sign app bundle (ad-hoc)
+        run: codesign --force --deep -s - dist/GestureMate.app
+
+      - name: Assemble package
+        run: |
+          mkdir dmg-staging
+          cp -R dist/GestureMate.app dmg-staging/
+          cp USER_GUIDE.md dmg-staging/README.md
+          hdiutil create -volname GestureMate -srcfolder dmg-staging -ov -format UDZO \
+            GestureMate-${{ github.ref_name }}-macos-${{ matrix.arch }}.dmg
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ matrix.arch }}
+          path: GestureMate-*.dmg
+
+  release:
+    needs: [build-linux, build-windows, build-macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
-          files: GestureMate-${{ github.ref_name }}-linux-x86_64.tar.gz
+          files: GestureMate-*
           generate_release_notes: true
+          body: |
+            > **macOS note:** the app is not notarized with Apple. On first launch,
+            > right-click GestureMate.app and choose **Open** (or allow it under
+            > System Settings → Privacy & Security). On Apple Silicon you may need:
+            > `xattr -cr /Applications/GestureMate.app`
+            >
+            > **Windows note:** the executable is unsigned, so SmartScreen may warn
+            > on first run — choose "More info" → "Run anyway".

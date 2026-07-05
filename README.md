@@ -25,18 +25,28 @@ A gesture drawing practice application for artists. GestureMate helps you practi
 - 🚀 **Quick Start**: Start sessions immediately without configuring settings
 - 🖼️ **Smart Image Scaling**: Images automatically fit to your screen size
 - 🎨 **Clean Interface**: Simple, distraction-free dark theme
-- 🐧 **Linux Compatible**: Built with PyQt6 for cross-platform support
+- 🖥️ **Cross-Platform**: Standalone builds for Linux, Windows, and macOS
 
 ## Installation
 
 ### Download (Recommended)
 
-Grab the latest standalone Linux build from the [releases page](https://github.com/A-Andrews/GestureMate/releases/latest) — no Python installation needed:
+Grab the latest standalone build for your platform from the [releases page](https://github.com/A-Andrews/GestureMate/releases/latest) — no Python installation needed.
+
+**Linux:**
 
 ```bash
 mkdir GestureMate && tar -xzf GestureMate-*-linux-x86_64.tar.gz -C GestureMate
 cd GestureMate
 ./GestureMate
+```
+
+**Windows:** Download and extract `GestureMate-*-windows-x86_64.zip`, then run `GestureMate.exe`. The executable is unsigned, so SmartScreen may warn on first run — choose "More info" → "Run anyway".
+
+**macOS:** Download the `.dmg` for your Mac (`arm64` for Apple Silicon, `x86_64` for Intel), open it, and drag `GestureMate.app` to Applications. The app is not notarized with Apple, so on first launch right-click the app and choose **Open** (or allow it under System Settings → Privacy & Security). If macOS reports the app as damaged, run:
+
+```bash
+xattr -cr /Applications/GestureMate.app
 ```
 
 ### Running from Source
