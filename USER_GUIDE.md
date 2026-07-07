@@ -75,6 +75,12 @@ All transformations can be toggled on/off independently during a session.
 - Shuffling is enabled by default for variety
 - Perfect for organized practice when disabled
 
+**Presets:**
+- Save your current settings (folders, timer durations, shuffle, halfway sound) as a named preset
+- Quickly switch between setups (e.g. "Quick sketch" vs "Long study") from the Presets dropdown in Settings
+- Select a preset and click Load to apply it, then OK to start using it
+- Presets are stored in your config file and persist across restarts
+
 ### 7. Progress Tracking
 - See how much time remains for the current image
 - Track total session time remaining
